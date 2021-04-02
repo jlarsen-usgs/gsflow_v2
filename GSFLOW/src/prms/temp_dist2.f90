@@ -13,14 +13,14 @@
 ! Variables needed from DATA FILE: tmax, tmin
 !***********************************************************************
       MODULE PRMS_TEMP_DIST2
-      USE PRMS_CONSTANTS, ONLY: MONTHS_PER_YEAR, ON, RUN, DECL, INIT, CLEAN, DOCUMENTATION, &
+      USE PRMS_CONSTANTS, ONLY: MONTHS_PER_YEAR, ACTIVE, DOCUMENTATION, READ_INIT, SAVE_INIT, &
      &    DNEARZERO, NEARZERO, MAXTEMP, MINTEMP, ERROR_data, GLACIER, ERROR_dim
-      USE PRMS_MODULE, ONLY: Process_flag, Model, Nhru, Ntemp, Init_vars_from_file, Save_vars_to_file, Glacier_flag
+      USE PRMS_MODULE, ONLY: Model, Nhru, Ntemp, Init_vars_from_file, Glacier_flag
       IMPLICIT NONE
 !   Local Variables
       character(len=*), parameter :: MODDESC = 'Temperature Distribution'
       character(len=10), parameter :: MODNAME = 'temp_dist2'
-      character(len=*), parameter :: Version_temp = '2020-09-14'
+      character(len=*), parameter :: Version_temp = '2020-12-02'
       INTEGER, SAVE, ALLOCATABLE :: N_tsta(:), Nuse_tsta(:, :)
       DOUBLE PRECISION, SAVE, ALLOCATABLE :: Dist(:, :)
       REAL, SAVE, ALLOCATABLE :: Delv(:, :), Elfac(:, :)
@@ -41,7 +41,8 @@
 !     Main temp_dist2 routine
 !***********************************************************************
       INTEGER FUNCTION temp_dist2()
-      USE PRMS_TEMP_DIST2
+      USE PRMS_CONSTANTS, ONLY: ACTIVE, OFF, RUN, DECL, INIT, CLEAN, READ_INIT, SAVE_INIT
+      USE PRMS_MODULE, ONLY: Process_flag, Init_vars_from_file, Save_vars_to_file
       IMPLICIT NONE
 ! Functions
       INTEGER, EXTERNAL :: t2dist2decl, t2dist2init, t2dist2run
@@ -54,10 +55,10 @@
       ELSEIF ( Process_flag==DECL ) THEN
         temp_dist2 = t2dist2decl()
       ELSEIF ( Process_flag==INIT ) THEN
-        IF ( Init_vars_from_file>0 ) CALL temp_dist2_restart(1)
+        IF ( Init_vars_from_file>OFF ) CALL temp_dist2_restart(READ_INIT)
         temp_dist2 = t2dist2init()
       ELSEIF ( Process_flag==CLEAN ) THEN
-        IF ( Save_vars_to_file==ON ) CALL temp_dist2_restart(0)
+        IF ( Save_vars_to_file==ACTIVE ) CALL temp_dist2_restart(SAVE_INIT)
       ENDIF
 
       END FUNCTION temp_dist2
@@ -414,7 +415,7 @@
 
         DO kk = 1, N_tsta(j)
           k = Nuse_tsta(kk, j)
-          IF ( Hru_type(j)==GLACIER .AND. Glacier_flag==ON ) Elfac(j, k) = (Hru_elev_ts(j)-Tsta_elev(k))/1000.0
+          IF ( Hru_type(j)==GLACIER .AND. Glacier_flag==ACTIVE ) Elfac(j, k) = (Hru_elev_ts(j)-Tsta_elev(k))/1000.0
 
 ! check for missing or bad temps
           IF ( Tmax(k)<mn ) CYCLE
@@ -486,7 +487,7 @@
       ! Local Variable
       CHARACTER(LEN=10) :: module_name
 !***********************************************************************
-      IF ( In_out==0 ) THEN
+      IF ( In_out==SAVE_INIT ) THEN
         WRITE ( Restart_outunit ) MODNAME
         WRITE ( Restart_outunit ) Solrad_tmax_good, Solrad_tmin_good
       ELSE

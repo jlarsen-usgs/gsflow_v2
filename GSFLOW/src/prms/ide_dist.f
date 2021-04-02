@@ -9,17 +9,14 @@
 ! Lauren Hay, November 2004
 !***********************************************************************
       MODULE PRMS_IDE
-      USE PRMS_CONSTANTS, ONLY: RUN, DECL, INIT, MONTHS_PER_YEAR, ON,
-     +    FEET2METERS, MM2INCH, GLACIER, FEET, CELSIUS, ERROR_data,
-     +    DOCUMENTATION
-      USE PRMS_MODULE, ONLY: Process_flag, Model, Nhru, Ntemp, Nrain,
-     +    Inputerror_flag
+      USE PRMS_CONSTANTS, ONLY: MONTHS_PER_YEAR, ACTIVE, DOCUMENTATION
+      USE PRMS_MODULE, ONLY: Model, Nhru, Ntemp, Nrain, Inputerror_flag
       IMPLICIT NONE
 !   Local Variables
       character(len=*), parameter :: MODDESC =
      +                               'Temp & Precip Distribution'
       character(len=*), parameter :: MODNAME = 'ide_dist'
-      character(len=*), parameter :: Version_ide_dist = '2020-08-19'
+      character(len=*), parameter :: Version_ide_dist = '2020-12-02'
       INTEGER, SAVE :: Temp_nsta, Rain_nsta
       INTEGER, SAVE, ALLOCATABLE :: Rain_nuse(:), Temp_nuse(:)
       DOUBLE PRECISION, SAVE :: Dalr
@@ -48,7 +45,8 @@
 !     Main ide_dist routine
 !***********************************************************************
       INTEGER FUNCTION ide_dist()
-      USE PRMS_IDE
+      USE PRMS_CONSTANTS, ONLY: RUN, DECL, INIT
+      USE PRMS_MODULE, ONLY: Process_flag
       IMPLICIT NONE
 ! Functions
       INTEGER, EXTERNAL :: idedecl, ideinit, iderun
@@ -118,14 +116,16 @@
       IF ( declparam(MODNAME, 'hru_x', 'nhru', 'real',
      +     '0.0', '-1.0E7', '1.0E7',
      +     'X for each HRU (albers)',
-     +     'Longitude (X) for each HRU in albers projection',
+     +     'Longitude (X) of each HRU for the centroid in albers'//
+     +     ' projection',
      +     'meters')/=0 ) CALL read_error(1, 'hru_x')
 
       ALLOCATE ( Hru_y(Nhru) )
       IF ( declparam(MODNAME, 'hru_y', 'nhru', 'real',
      +     '0.0', '-1.0E7', '1.0E7',
      +     'Y for each HRU (albers)',
-     +     'Latitude (Y) for each HRU in albers projection',
+     +     'Latitude (Y) of each HRU for the centroid in albers'//
+     +     ' projection',
      +     'meters')/=0 ) CALL read_error(1, 'hru_y')
 
       ALLOCATE ( Tsta_x(Ntemp) )
@@ -357,7 +357,7 @@
       Temp_nsta = 0
       Temp_nuse = 0
       DO i = 1, Ntemp
-        IF ( Tsta_nuse(i)==ON ) THEN
+        IF ( Tsta_nuse(i)==ACTIVE ) THEN
           Temp_nsta = Temp_nsta + 1
           Temp_nuse(Temp_nsta) = i
         ENDIF
@@ -371,7 +371,7 @@
       Rain_nsta = 0
       Rain_nuse = 0
       DO i = 1, Nrain
-        IF ( Psta_nuse(i)==ON ) THEN
+        IF ( Psta_nuse(i)==ACTIVE ) THEN
           Rain_nsta = Rain_nsta + 1
           Rain_nuse(Rain_nsta) = i
         ENDIF
@@ -425,10 +425,12 @@
 !               Outputs a daily max and min Temperature by HRU elevation
 !***********************************************************************
       INTEGER FUNCTION ide_temp_run(Temp_wght_dist, Temp_wght_elev)
+      USE PRMS_CONSTANTS, ONLY: FEET2METERS, GLACIER, FEET, CELSIUS
+      USE PRMS_MODULE, ONLY: Ntemp, Nrain
       USE PRMS_IDE, ONLY: Hru_x, Hru_y, Tmax_rain_sta, Solrad_elev,
      +    Tmin_rain_sta, Temp_nuse, Temp_nsta, Tsta_x, Tsta_y, Dist_exp,
      +    Psta_x, Psta_y, Basin_centroid_x, Basin_centroid_y,
-     +    Ndist_tsta, Nrain, Ntemp, FEET2METERS, GLACIER, FEET, CELSIUS
+     +    Ndist_tsta
       USE PRMS_BASIN, ONLY: Basin_area_inv, Hru_area, Active_hrus,
      +    Hru_route_order, Hru_elev_meters, Hru_elev_ts, Hru_type,
      +    Elev_units
@@ -601,11 +603,13 @@
 !***********************************************************************
 !***********************************************************************
       INTEGER FUNCTION ide_rain_run(Prcp_wght_dist, Prcp_wght_elev)
+      USE PRMS_CONSTANTS, ONLY: FEET2METERS, MM2INCH, GLACIER, FEET,
+     +    CELSIUS, ERROR_data
+      USE PRMS_MODULE, ONLY: Nrain
       USE PRMS_IDE, ONLY: Hru_x, Hru_y, Psta_x, Psta_y,
      +    Rain_nuse, Rain_nsta, Tmax_rain_sta, Tmin_rain_sta,
      +    Ndist_psta, Dist_exp, Precip_ide, Adjust_snow, Adjust_rain,
-     +    Tmax_allsnow_sta, Tmax_allrain_sta, Nrain, MM2INCH,
-     +    FEET2METERS, GLACIER, FEET, CELSIUS, ERROR_data
+     +    Tmax_allsnow_sta, Tmax_allrain_sta
       USE PRMS_BASIN, ONLY: Hru_area, Basin_area_inv, Active_hrus,
      +    Hru_route_order, Hru_elev_meters, Hru_elev_ts, Hru_type,
      +    Elev_units
@@ -735,7 +739,7 @@
 !***********************************************************************
       SUBROUTINE compute_inv(Imax, Nsta, Nuse, Sta_x, X, Sta_y, Y, Dat,
      +                       Dat_dist, Ndist, Dist_exp)
-      USE PRMS_IDE, ONLY: ERROR_data
+      USE PRMS_CONSTANTS, ONLY: ERROR_data
       IMPLICIT NONE
 ! Functions
       INTRINSIC :: SQRT, DBLE, SNGL

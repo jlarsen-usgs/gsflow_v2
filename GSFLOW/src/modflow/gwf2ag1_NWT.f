@@ -49,8 +49,8 @@
         REAL, SAVE, DIMENSION(:), POINTER :: TRIGGERPERIODSEG
         REAL, SAVE, DIMENSION(:), POINTER :: TIMEINPERIODSEG
         REAL, SAVE, DIMENSION(:), POINTER :: TIMEINPERIODWELL
-        REAL, SAVE, DIMENSION(:), POINTER :: AETITERSW
-        REAL, SAVE, DIMENSION(:), POINTER :: AETITERGW
+        REAL, SAVE, DIMENSION(:), POINTER :: AETITERSW, RMSESW
+        REAL, SAVE, DIMENSION(:), POINTER :: AETITERGW, RMSEGW
         REAL, SAVE, DIMENSION(:, :), POINTER :: WELLIRRUZF
         REAL, SAVE, DIMENSION(:, :), POINTER :: WELLIRRPRMS
         REAL, SAVE, DIMENSION(:, :), POINTER :: IRRFACT
@@ -283,7 +283,7 @@
       ALLOCATE (IRRWELVAR(NUMIRRHOLD))
       ALLOCATE (WELLIRRUZF(NUMCOLS, NUMROWS), NUMCELLS(MXACTWIRR))
       ALLOCATE (WELLIRRPRMS(MAXCELLSHOLD, MXACTWIRR))
-      ALLOCATE (AETITERGW(MXACTWIRR))
+      ALLOCATE (AETITERGW(MXWELL),RMSEGW(MXWELL))
       ALLOCATE (IRRFACT(MAXCELLSHOLD, MXACTWIRR))
       ALLOCATE (IRRFIELDFACT(MAXCELLSHOLD, MXACTWIRR))
       ALLOCATE (SUPFLOW(MXACTWSUP))
@@ -303,6 +303,7 @@
       FRACSUPMAX = 0.0
       SUPFLOW = 0.0
       AETITERGW = 0.0
+      RMSEGW = 0.0
       KCROPWELL = 0.0
       NUMSUPWELLSEG = 0
       !
@@ -313,7 +314,7 @@
          ALLOCATE (KCROPDIVERSION(MAXCELLSDIVERSION, NSEGDIMTEMP))
          ALLOCATE (IRRROW_SW(MAXCELLSDIVERSION, NSEGDIMTEMP))
          ALLOCATE (IRRCOL_SW(MAXCELLSDIVERSION, NSEGDIMTEMP))
-         ALLOCATE (AETITERSW(NSEGDIMTEMP))
+         ALLOCATE (AETITERSW(NSEGDIMTEMP), RMSESW(NSEGDIMTEMP))
          ALLOCATE (DVRPERC(MAXCELLSDIVERSION, NSEGDIMTEMP))
          ALLOCATE (DIVERSIONIRRUZF(NCOL, NROW))
          ALLOCATE (DIVERSIONIRRPRMS(MAXCELLSDIVERSION, NSEGDIMTEMP))
@@ -323,7 +324,7 @@
          ALLOCATE (IRRROW_SW(1, 1), IRRCOL_SW(1, 1))
          ALLOCATE (DVRPERC(1, 1))
          ALLOCATE (DIVERSIONIRRUZF(1, 1), DIVERSIONIRRPRMS(1, 1))
-         ALLOCATE (IRRSEG(1), AETITERSW(1))
+         ALLOCATE (IRRSEG(1), AETITERSW(1),RMSESW(1))
       END IF
       DVRCH = 0
       DVEFF = 0.0
@@ -331,6 +332,7 @@
       IRRROW_SW = 0
       IRRCOL_SW = 0
       AETITERSW = 0.0
+      RMSESW = 0.0
       DIVERSIONIRRUZF = 0.0
       DIVERSIONIRRPRMS = 0.0
       DVRPERC = 0.0
@@ -1512,7 +1514,7 @@
             DO I = 1, NUMSW - 1
                IF (UNIT == TSSWUNIT(I)) ITEST = 1
             END DO
-            IF (ITEST /= 1) CALL WRITE_HEADER('DIV', NUMSW)
+            IF (ITEST /= 1) CALL WRITE_HEADER_AG('DIV', NUMSW)
             IF (SGNM > NSEGDIMTEMP) THEN
                WRITE (IOUT, *) 'Bad segment number for AG time series. '
                CALL USTOP('Bad segment number for AG time series.')
@@ -1527,7 +1529,7 @@
             DO I = 1, NUMGW - 1
                IF (UNIT == TSGWUNIT(I)) ITEST = 1
             END DO
-            IF (ITEST /= 1) CALL WRITE_HEADER('WEL', NUMGW)
+            IF (ITEST /= 1) CALL WRITE_HEADER_AG('WEL', NUMGW)
             IF (WLNM > MXWELL) THEN
                WRITE (IOUT, *) 'Bad well number for AG time series. '
                CALL USTOP('Bad well number for AG time series.')
@@ -1542,7 +1544,7 @@
             DO I = 1, NUMSWET - 1
                IF (UNIT == TSSWUNIT(I)) ITEST = 1
             END DO
-            IF (ITEST /= 1) CALL WRITE_HEADER('SET', NUMSWET)
+            IF (ITEST /= 1) CALL WRITE_HEADER_AG('SET', NUMSWET)
             IF (SGNM > NSEGDIMTEMP) THEN
                WRITE (IOUT, *) 'Bad segment number for AG time series. '
                CALL USTOP('Bad segment number for AG time series.')
@@ -1557,7 +1559,7 @@
             DO I = 1, NUMGWET - 1
                IF (UNIT == TSGWETUNIT(I)) ITEST = 1
             END DO
-            IF (ITEST /= 1) CALL WRITE_HEADER('GET', NUMGWET)
+            IF (ITEST /= 1) CALL WRITE_HEADER_AG('GET', NUMGWET)
             IF (WLNM > MXWELL) THEN
                WRITE (IOUT, *) 'Bad well number for AG ET time series. '
                CALL USTOP('Bad well number for AG ET time series.')
@@ -1565,12 +1567,12 @@
          case ('WELLETALL')
             CALL URWORD(LINE, LLOC, ISTART, ISTOP, 2, UNIT, R, IOUT, IN)
             TSGWETALLUNIT = UNIT
-            CALL WRITE_HEADER('AL1', NUMGWET)
+            CALL WRITE_HEADER_AG('AL1', NUMGWET)
             NUMGWETALL = 1
          case ('WELLALL')
             CALL URWORD(LINE, LLOC, ISTART, ISTOP, 2, UNIT, R, IOUT, IN)
             TSGWALLUNIT = UNIT
-            CALL WRITE_HEADER('AL2', NUMGWET)
+            CALL WRITE_HEADER_AG('AL2', NUMGWET)
             NUMGWALL = 1
          case ('END')
             write (iout, '(/1x,a)') 'FINISHED READING '//
@@ -1604,8 +1606,8 @@
       RETURN
       END
       !
-      ! - ------SUBROUTINE WRITE_HEADER
-      SUBROUTINE WRITE_HEADER(TSTYPE, NUM)
+      ! - ------SUBROUTINE WRITE_HEADER_AG
+      SUBROUTINE WRITE_HEADER_AG(TSTYPE, NUM)
         ! READ SEGMENTS AND WELLS WITH TIME SERIES OUTPUT
         USE GWFAGMODULE
         IMPLICIT NONE
@@ -1647,10 +1649,10 @@
            WRITE (UNIT, *) 'TIME KPER KSTP NULL GW-DEMAND GW-PUMPED ',
      +                     'NULL'
         end select
-      END SUBROUTINE WRITE_HEADER
+      END SUBROUTINE WRITE_HEADER_AG
 
       !
-      SUBROUTINE GWF2AG7FM(Kkper, Kkstp, Kkiter, Iunitnwt)
+      SUBROUTINE GWF2AG7FM(Kkper, Kkstp, Kkiter, Iunitnwt, agconverge)
       !******************************************************************
       ! CALCULATE APPLIED IRRIGATION, DIVERISONS, AND PUMPING
       !******************************************************************
@@ -1670,6 +1672,7 @@
       ! ARGUMENTS:
       ! - -----------------------------------------------------------------
       INTEGER, INTENT(IN) :: KKPER, KKSTP, KKITER, Iunitnwt
+      INTEGER, INTENT(INOUT) :: agconverge
       !
       ! VARIABLES:
       ! - -----------------------------------------------------------------
@@ -1703,13 +1706,16 @@
       QQ = ZERO
       QSW = ZERO
       TIME = TOTIM
+      RMSESW = ZERO
+      RMSEGW = ZERO
+      agconverge = 1
       !
       !2 - -----IF DEMAND BASED ON ET DEFICIT THEN CALCULATE VALUES
       IF (ETDEMANDFLAG > 0) THEN
          IF (GSFLOW_flag == 0) THEN
-            CALL demandconjunctive_uzf(kkper, kkstp, kkiter)
+           CALL demandconjunctive_uzf(kkper, kkstp, kkiter, agconverge)
          ELSE
-            CALL demandconjunctive_prms(kkper, kkstp, kkiter)
+           CALL demandconjunctive_prms(kkper, kkstp, kkiter, agconverge)
          END IF
       END IF
       IF (TRIGGERFLAG > 0) THEN
@@ -1730,9 +1736,9 @@
       !3 - -----SET MAX PUMPING RATE OR IRR DEMAND FOR GW.
       DO L = 1, NWELLS
          IF (NUMTAB .LE. 0) THEN
-            IR = WELL(2, L)
-            IC = WELL(3, L)
-            IL = WELL(1, L)
+            IR = INT( WELL(2, L) )
+            IC = INT( WELL(3, L) )
+            IL = INT( WELL(1, L) )
             Q = WELL(4, L)
          ELSE
             IR = TABROW(L)
@@ -1752,7 +1758,7 @@
                DO I = 1, NUMSEGS(L)
                   J = DIVERSIONSEG(I, L)
                   QSW = SEG(2, J)
-                  If ( kkiter > 1 ) QSW = DVRSFLW(J)
+                  IF ( kkiter > 1 ) QSW = DVRSFLW(J)
                   IF (ETDEMANDFLAG > 0) THEN
                      FMIN = SUPACT(J)
                   ELSE IF (TRIGGERFLAG > 0) then
@@ -1780,16 +1786,18 @@
                !7 - -----CALCULATE ETDEMAND IF NOT SUPPLEMENTAL WELL.
                IF (ETDEMANDFLAG > 0) THEN
                   IF (GSFLOW_flag == 0) THEN
-                     QQ = demandgw_uzf(l, kkper, kkstp, kkiter, time)
+                     QQ = demandgw_uzf(l, kkper, kkstp, kkiter, time, 
+     +                                 agconverge)
                   ELSE
-                     QQ = demandgw_prms(l, kkper, kkstp, kkiter)
+                     QQ = demandgw_prms(l, kkper, kkstp, kkiter, 
+     +                                  agconverge)
                   END IF
                ELSEIF (TRIGGERFLAG > 0) then
                   QQ = demandtrigger_gw(Q, kkper, kkstp, kkiter, l)   
                END IF
                IF (QQ < Q) QQ = Q
                Q = QQ
-               QONLY(L) = DONENEG*Q
+               QONLY(L) = SNGL( DONENEG*Q )
             END IF
             !
             !8 - -----IF THE CELL IS VARIABLE HEAD THEN SUBTRACT Q FROM
@@ -1828,12 +1836,12 @@
             DO I = 1, NUMSEGS(L)  ! need to test when multiple segs supported by single well
                J = DIVERSIONSEG(I, L)
                SUP = SUP - Qp
-               ACTUAL(J) = ACTUAL(J) + SUP
+               ACTUAL(J) = ACTUAL(J) + SNGL( SUP )
             END DO
             !
             !9b - -----SET ACTUAL PUMPING FOR NON SUP IRRIGATION WELLS.
             !
-            Qonly(L) = DONENEG*Q
+            Qonly(L) = SNGL( DONENEG*Q )
             !
             !10------APPLY IRRIGATION FROM WELLS
             !
@@ -1843,13 +1851,14 @@
                   SUBRATE = SUBVOL/(DELR(IRRCOL_GW(I, L))*
      +                      DELC(IRRROW_GW(I, L)))
                   WELLIRRUZF(IRRCOL_GW(I, L), IRRROW_GW(I, L)) =
-     +            WELLIRRUZF(IRRCOL_GW(I, L), IRRROW_GW(I, L)) + SUBRATE
+     +            WELLIRRUZF(IRRCOL_GW(I, L), IRRROW_GW(I, L)) +
+     +            SNGL( SUBRATE )
                END DO
             ELSE
                DO I = 1, NUMCELLS(L)
                   SUBVOL = -(DONE - IRRFACT(I, L))*Qp*IRRFIELDFACT(I, L)
                   ! Keep irrigation for PRMS as volumetric rate
-                  WELLIRRPRMS(I, L) = WELLIRRPRMS(I, L) + SUBVOL
+                  WELLIRRPRMS(I, L) = WELLIRRPRMS(I, L) + SNGL( SUBVOL )
                END DO
             END IF
          END IF
@@ -1863,18 +1872,18 @@
                icc = IRRCOL_SW(icount, istsg)
                dvt = SGOTFLW(istsg)*DVRPERC(ICOUNT,istsg)
                !dvt = seg(2, istsg)*DVRPERC(ICOUNT, istsg)
-               if (dvt < zero) dvt = 0.0
+               if (dvt < zero) dvt = 0.0D0
                dvt = dvt/(DELR(icc)*DELC(irr))
                DIVERSIONIRRUZF(icc, irr) = DIVERSIONIRRUZF(icc, irr) +
-     +                                dvt*(1.0 - DVEFF(ICOUNT, istsg))
+     +                        SNGL( dvt*(1.0D0 - DVEFF(ICOUNT, istsg)) )
             END DO
          ELSE
             DO icount = 1, DVRCH(istsg)
                dvt = SGOTFLW(istsg)*DVRPERC(ICOUNT, istsg)
-               dvt = (1.0 - DVEFF(ICOUNT, istsg))*dvt
+               dvt = (1.0D0 - DVEFF(ICOUNT, istsg))*dvt
          ! Keep irrigation for PRMS as volume
                DIVERSIONIRRPRMS(icount, istsg) = 
-     +         DIVERSIONIRRPRMS(icount, istsg) + dvt
+     +         DIVERSIONIRRPRMS(icount, istsg) + SNGL( dvt )
             END DO
          END IF
       END DO
@@ -1912,7 +1921,7 @@
       DOUBLE PRECISION :: SUP, SUBVOL, RATINAG, RATOUTAG, AREA
       DOUBLE PRECISION :: QSW, QSWIRR, QWELL, QWELLIRR, QWELLET
       DOUBLE PRECISION :: QSWGL, DONE
-      REAL :: Q, TIME, RATETERPQ, QIRR, BUDPERC
+      REAL :: Q, TIME, RATETERPQ, QIRR, BUDPERC, RIN_SNGL, ROUT_SNGL
       INTEGER :: NWELLSTEMP, L, I, J, ISTSG, ICOUNT, IL
       INTEGER :: IC, IR, IBDLBL, IW1
       INTEGER :: IBD1, IBD2, IBD3, IBD4, IBD5
@@ -1921,7 +1930,7 @@
       DOUBLE PRECISION :: SMOOTHQ, bbot, ttop, hh
       DOUBLE PRECISION :: Qp, QQ, Qsave, dQp
       DOUBLE PRECISION :: DONENEG
-      DATA TEXT1/'           AG WELLS'/
+      DATA TEXT1/'       AG WELLS'/
       DATA TEXT2/'  DIVERSION SEGMENTS'/
       DATA TEXT3/'       SW IRRIGATION'/
       DATA TEXT4/'       GW IRRIGATION'/
@@ -2016,9 +2025,9 @@
       !5 - -----CALCULATE DIVERSION SHORTFALL TO SET SUPPLEMENTAL PUMPING DEMAND
       DO L = 1, NWELLSTEMP
          IF (NUMTAB .LE. 0) THEN
-            IR = WELL(2, L)
-            IC = WELL(3, L)
-            IL = WELL(1, L)
+            IR = INT( WELL(2, L) )
+            IC = INT( WELL(3, L) )
+            IL = INT( WELL(1, L) )
             Q = WELL(4, L)
          ELSE
             IR = TABROW(L)
@@ -2043,7 +2052,7 @@
             ELSE
                !
                !6b - -----NOT SUPPLEMENTAL WELL SET DEMAND
-               Q = DONENEG*QONLY(L)
+               Q = SNGL(DONENEG*QONLY(L))
             END IF
             QSAVE = Q
             !
@@ -2053,12 +2062,12 @@
             IF (Iunitnwt .NE. 0) THEN
                IF (LAYTYPUPW(il) .GT. 0) THEN
                   Qp = smoothQ(Hh, Ttop, Bbot, dQp)
-                  Q = Q*Qp
+                  Q = Q*SNGL(Qp)
                ELSE
-                  Q = Qsave
+                  Q = SNGL( Qsave )
                END IF
             ELSE
-               Q = Qsave
+               Q = SNGL( Qsave )
             END IF
             QQ = Q
             !8 - -----SET ACTUAL SUPPLEMENTAL PUMPING BY DIVERSION FOR IRRIGATION.
@@ -2066,8 +2075,8 @@
             DO I = 1, NUMSEGS(L)
                J = DIVERSIONSEG(I, L)
                SUP = SUP - Q
-               ACTUAL(J) = ACTUAL(J) + SUP
-               SUPSEG(J) = SUPSEG(J) - Q/dble(NUMSEGS(L))
+               ACTUAL(J) = ACTUAL(J) + SNGL( SUP )
+               SUPSEG(J) = SUPSEG(J) - SNGL( Q/NUMSEGS(L) )
             END DO
             !
             !9 - -----CALCULATE IRRIGATION FROM WELLS
@@ -2091,7 +2100,7 @@
          END IF
          !
          !11A - ----ADD FLOW RATE TO BUFFER.
-         BUFF(IC, IR, IL) = BUFF(IC, IR, IL) + QQ
+         BUFF(IC, IR, IL) = BUFF(IC, IR, IL) + SNGL( QQ )
          !
          !11D-----FLOW RATE IS ALWAYS NEGATIVE(DISCHARGE) .ADD IT TO RATOUT.
          RATOUT = RATOUT - QQ
@@ -2102,7 +2111,7 @@
      +                     Q,WELL(:, L), NWELVL, NAUX, 5, IBOUND, NLAY)
          !
          ! - -------COPY FLOW TO WELL LIST.
-         WELL(NWELVL, L) = QQ
+         WELL(NWELVL, L) = SNGL( QQ )
          END IF
       END DO
       !
@@ -2141,9 +2150,9 @@
          WRITE (IBD1, 61) TEXT1, KKPER, KKSTP
          DO L = 1, NWELLSTEMP
             IF (NUMTAB .LE. 0) THEN
-               IR = WELL(2, L)
-               IC = WELL(3, L)
-               IL = WELL(1, L)
+               IR = INT( WELL(2, L) )
+               IC = INT( WELL(3, L) )
+               IL = INT( WELL(1, L) )
             ELSE
                IR = TABROW(L)
                IC = TABCOL(L)
@@ -2222,10 +2231,12 @@
       !15 - -----MOVE RATES, VOLUMES&LABELS INTO ARRAYS FOR PRINTING.
       RIN = RATIN
       ROUT = RATOUT
-      VBVL(3, MSUM) = sngl(RIN)
-      VBVL(4, MSUM) = sngl(ROUT)
-      VBVL(1, MSUM) = VBVL(1, MSUM) + RIN*DELT
-      VBVL(2, MSUM) = VBVL(2, MSUM) + ROUT*DELT
+      RIN_SNGL = SNGL(RIN)
+      ROUT_SNGL = SNGL(ROUT)
+      VBVL(3, MSUM) = RIN_SNGL
+      VBVL(4, MSUM) = ROUT_SNGL
+      VBVL(1, MSUM) = VBVL(1, MSUM) + RIN_SNGL*DELT
+      VBVL(2, MSUM) = VBVL(2, MSUM) + ROUT_SNGL*DELT
       VBNM(MSUM) = TEXT9
       !
       !16 - -----INCREMENT BUDGET TERM COUNTER(MSUM) .
@@ -2233,12 +2244,14 @@
       !
       !18 - -----MOVE RATES, VOLUMES&LABELS INTO ARRAYS FOR PRINTING
       ! GW PUMPING (NEGATIVE OUT OF GW)
-      RIN = -QWELL   
+      RIN = -QWELL
       ROUT = ZERO
-      VBVLAG(3, MSUMAG) = sngl(RIN)
-      VBVLAG(4, MSUMAG) = sngl(ROUT)
-      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN*DELT
-      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT*DELT
+      RIN_SNGL = SNGL(RIN)
+      ROUT_SNGL = SNGL(ROUT)
+      VBVLAG(3, MSUMAG) = RIN_SNGL
+      VBVLAG(4, MSUMAG) = ROUT_SNGL
+      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN_SNGL*DELT
+      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT_SNGL*DELT
       VBNMAG(MSUMAG) = TEXT1
       MSUMAG = MSUMAG + 1
       !
@@ -2247,38 +2260,44 @@
       ROUT = ZERO
       VBVLAG(3, MSUMAG) = sngl(RIN)
       VBVLAG(4, MSUMAG) = sngl(ROUT)
-      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN*DELT
-      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT*DELT
+      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + SNGL(RIN)*DELT
+      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + SNGL(ROUT)*DELT
       VBNMAG(MSUMAG) = TEXT2
       MSUMAG = MSUMAG + 1
       !
       !18 - ------GW IRRIGATION
       RIN = ZERO
       ROUT = QWELLIRR
-      VBVLAG(3, MSUMAG) = sngl(RIN)
-      VBVLAG(4, MSUMAG) = sngl(ROUT)
-      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN*DELT
-      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT*DELT
+      RIN_SNGL = SNGL(RIN)
+      ROUT_SNGL = SNGL(ROUT)
+      VBVLAG(3, MSUMAG) = RIN_SNGL
+      VBVLAG(4, MSUMAG) = ROUT_SNGL
+      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN_SNGL*DELT
+      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT_SNGL*DELT
       VBNMAG(MSUMAG) = TEXT4
       MSUMAG = MSUMAG + 1
       !
       !18 - ------SW IRRIGATION
       RIN = ZERO
       ROUT = QSWIRR
-      VBVLAG(3, MSUMAG) = sngl(RIN)
-      VBVLAG(4, MSUMAG) = sngl(ROUT)
-      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN*DELT
-      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT*DELT
+      RIN_SNGL = SNGL(RIN)
+      ROUT_SNGL = SNGL(ROUT)
+      VBVLAG(3, MSUMAG) = RIN_SNGL
+      VBVLAG(4, MSUMAG) = ROUT_SNGL
+      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN_SNGL*DELT
+      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT_SNGL*DELT
       VBNMAG(MSUMAG) = TEXT3
       MSUMAG = MSUMAG + 1
       !
       !18 - ------GW EFFICIENCY ET
       RIN = ZERO
       ROUT = QWELLET
-      VBVLAG(3, MSUMAG) = sngl(RIN)
-      VBVLAG(4, MSUMAG) = sngl(ROUT)
-      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN*DELT
-      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT*DELT
+      RIN_SNGL = SNGL(RIN)
+      ROUT_SNGL = SNGL(ROUT)
+      VBVLAG(3, MSUMAG) = RIN_SNGL
+      VBVLAG(4, MSUMAG) = ROUT_SNGL
+      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN_SNGL*DELT
+      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT_SNGL*DELT
       VBNMAG(MSUMAG) = TEXT8
       MSUMAG = MSUMAG + 1
       !
@@ -2290,10 +2309,12 @@
          RIN = -DONE*QSWGL
          ROUT = ZERO
       END IF
-      VBVLAG(3, MSUMAG) = sngl(RIN)
-      VBVLAG(4, MSUMAG) = sngl(ROUT)
-      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN*DELT
-      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT*DELT
+      RIN_SNGL = SNGL(RIN)
+      ROUT_SNGL = SNGL(ROUT)
+      VBVLAG(3, MSUMAG) = RIN_SNGL
+      VBVLAG(4, MSUMAG) = ROUT_SNGL
+      VBVLAG(1, MSUMAG) = VBVLAG(1, MSUMAG) + RIN_SNGL*DELT
+      VBVLAG(2, MSUMAG) = VBVLAG(2, MSUMAG) + ROUT_SNGL*DELT
       VBNMAG(MSUMAG) = TEXT7
       MSUMAG = MSUMAG + 1
       IF (IBUDFL .NE. 0)
@@ -2320,7 +2341,7 @@
       END
 ! ----------------------------------------------------------------------
 !
-      SUBROUTINE DEMANDCONJUNCTIVE_UZF(kper, kstp, kiter)
+      SUBROUTINE DEMANDCONJUNCTIVE_UZF(kper, kstp, kiter, agconverge)
 !     ******************************************************************
 !     demandconjunctive---- sums up irrigation demand using ET deficit
 !     ******************************************************************
@@ -2335,6 +2356,7 @@
       !modules
       !arguments
       integer, intent(in) :: kper, kstp, kiter
+      integer, intent(inout) :: agconverge
       !dummy
       DOUBLE PRECISION :: factor, area, uzet, aet, pet
       double precision :: zerod7, done, dzero, pettotal,
@@ -2409,7 +2431,7 @@
 ! ----------------------------------------------------------------------
 !
 !
-      subroutine demandconjunctive_prms(kper, kstp, kiter)
+      subroutine demandconjunctive_prms(kper, kstp, kiter, agconverge)
 !     ******************************************************************
 !     demandconjunctive---- sums up irrigation demand using ET deficit
 !     ******************************************************************
@@ -2419,7 +2441,8 @@
       USE GWFBASMODULE, ONLY: DELT
       USE PRMS_MODULE, ONLY: Nhru, Nhrucell, Gvr_cell_id
       USE PRMS_BASIN, ONLY: HRU_PERV
-      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+!      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+      USE PRMS_SOILZONE, ONLY: PERV_ACTET
       USE PRMS_CLIMATEVARS, ONLY: POTET
       USE GSFMODFLOW, ONLY: Mfl2_to_acre, Mfl_to_inch, Gwc_col, Gwc_row
       USE GWFUZFMODULE, ONLY: UZFETOUT, GWET
@@ -2428,11 +2451,12 @@
       !modules
       !arguments
       integer, intent(in) :: kper, kstp, kiter
+      integer, intent(inout) :: agconverge
       !dummy
       DOUBLE PRECISION :: factor, area, aet, pet, uzet
       double precision :: zerod7, done, dzero, pettotal,
      +                    aettotal, prms_inch2mf_q,
-     +                    aetold, supold, sup !, etdif
+     +                    aetold, supold, sup, dtwo, zerod2 !, etdif
 !      real :: fmaxflow
       integer :: k, iseg, hru_id, i, icell, irow, icol
       external :: set_factor
@@ -2440,7 +2464,9 @@
 ! --------------------------------------------------
 !
       zerod7 = 1.0d-7
+      zerod2 = 1.0d-2
       done = 1.0d0
+      dtwo = 2.0d0
       dzero = 0.0d0
       prms_inch2mf_q = done/(DELT*Mfl2_to_acre*Mfl_to_inch)
       !
@@ -2459,7 +2485,7 @@
            hru_id = IRRROW_SW(k, iseg)
            area = HRU_PERV(hru_id)
            pet = potet(hru_id)*area*prms_inch2mf_q
-           aet = hru_actet(hru_id)*area*prms_inch2mf_q
+           aet = perv_actet(hru_id)*area*prms_inch2mf_q
            pettotal = pettotal + pet
            aettotal = aettotal + aet
            if ( Nhru==Nhrucell ) then
@@ -2477,6 +2503,8 @@
         supold = SUPACTOLD(ISEG) + ACTUALOLD(ISEG)
         factor = set_factor(iseg, aetold, pettotal, aettotal, sup,
      +           supold, kper, kstp, kiter)
+        RMSESW(ISEG) = SQRT((aetold - aettotal)**dtwo)
+        IF ( RMSESW(ISEG) > zerod2*pettotal ) AGCONVERGE = 0
         AETITERSW(ISEG) = SNGL(aettotal)
         SUPACTOLD(ISEG) = DVRSFLW(iseg)
         SUPACT(iseg) = SUPACT(iseg) + SNGL(factor)
@@ -2515,7 +2543,8 @@
       USE GWFAGMODULE
       USE GWFUZFMODULE, ONLY: GWET, UZFETOUT, PETRATE
       USE GWFBASMODULE, ONLY: DELT
-      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+!      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+      USE PRMS_SOILZONE, ONLY: PERV_ACTET
       USE PRMS_CLIMATEVARS, ONLY: POTET
       USE PRMS_MODULE, ONLY: GSFLOW_flag
       USE PRMS_BASIN, ONLY: HRU_PERV
@@ -2565,7 +2594,7 @@
                hru_id = IRRROW_SW(k, iseg)
                area = HRU_PERV(hru_id)
                pet = potet(hru_id)*area*prms_inch2mf_q
-               aet = hru_actet(hru_id)*area*prms_inch2mf_q
+               aet = perv_actet(hru_id)*area*prms_inch2mf_q
                if ( Nhru==Nhrucell ) then
                  icell = Gvr_cell_id(hru_id)
                  irow = Gwc_row(icell)
@@ -2614,7 +2643,8 @@
       USE GWFAGMODULE
       USE GWFUZFMODULE, ONLY: GWET, UZFETOUT, PETRATE
       USE GWFBASMODULE, ONLY: DELT
-      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+!      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+      USE PRMS_SOILZONE, ONLY: PERV_ACTET
       USE PRMS_CLIMATEVARS, ONLY: POTET
       USE PRMS_MODULE, ONLY: GSFLOW_flag
       USE PRMS_MODULE, ONLY: Nhru, Nhrucell, Gvr_cell_id
@@ -2655,7 +2685,7 @@
             hru_id = IRRROW_GW(i, l)
             area = HRU_PERV(hru_id)
             pet = potet(hru_id)*area*prms_inch2mf_q
-            aet = hru_actet(hru_id)*area*prms_inch2mf_q
+            aet = perv_actet(hru_id)*area*prms_inch2mf_q
             if ( Nhru==Nhrucell ) then
               icell = Gvr_cell_id(hru_id)
               irow = Gwc_row(icell)
@@ -2683,7 +2713,8 @@
      +                                 demandtrigger_gw = Q
       end function demandtrigger_gw
       
-      double precision function demandgw_uzf(l, kper, kstp, kiter, time)
+      double precision function demandgw_uzf(l, kper, kstp, kiter, time,
+     +                                       agconverge)
 !     ******************************************************************
 !     demandgw---- sums up irrigation demand using ET deficit for gw
 !     ******************************************************************
@@ -2697,6 +2728,7 @@
       !modules
       !arguments
       integer, intent(in) :: l, kiter, kper, kstp
+      integer, intent(inout) :: agconverge
       real, intent(in) :: time
       !dummy
       DOUBLE PRECISION :: factor, area, uzet, aet, pet
@@ -2746,7 +2778,8 @@
       end function demandgw_uzf
 !
 !
-      double precision function demandgw_prms(l, kper, kstp, kiter)
+      double precision function demandgw_prms(l, kper, kstp, kiter, 
+     +                                        agconverge)
 !     ******************************************************************
 !     demandgw---- sums up irrigation demand using ET deficit for gw
 !     ******************************************************************
@@ -2755,9 +2788,9 @@
       USE GWFBASMODULE, ONLY: DELT
       USE PRMS_BASIN, ONLY: HRU_PERV
       USE GWFUZFMODULE, ONLY: GWET, UZFETOUT
-      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+!      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
       USE PRMS_CLIMATEVARS, ONLY: POTET
-      USE PRMS_SOILZONE, ONLY: Soil_saturated
+      USE PRMS_SOILZONE, ONLY: Soil_saturated, PERV_ACTET
       USE PRMS_MODULE, ONLY: Nhru, Nhrucell, Gvr_cell_id
       USE GSFMODFLOW, ONLY: Mfl2_to_acre, Mfl_to_inch, Gwc_col, Gwc_row
       IMPLICIT NONE
@@ -2765,17 +2798,20 @@
       !modules
       !arguments
       integer, intent(in) :: l, kper, kstp, kiter
+      integer, intent(inout) :: agconverge
       !dummy
       DOUBLE PRECISION :: factor, area, aet, pet, prms_inch2mf_q,
      +                    aetold, supold, sup, aettotal, pettotal
-      double precision :: done, dzero, doneneg
+      double precision :: done, dzero, doneneg, dtwo, zerod2
       integer :: i, hru_id, icell, irow, icol 
       external :: set_factor
       double precision :: set_factor, uzet
 ! --------------------------------------
 !
       dzero = 0.0d0
+      zerod2 = 1.0d-2
       done = 1.0d0
+      dtwo = 2.0d0
       doneneg = -1.0d0
       demandgw_prms = DZERO
       pettotal = DZERO
@@ -2785,7 +2821,7 @@
          hru_id = IRRROW_GW(I, L)
          area = HRU_PERV(hru_id)
          pet = potet(hru_id)*area*prms_inch2mf_q
-         aet = hru_actet(hru_id)*area*prms_inch2mf_q
+         aet = perv_actet(hru_id)*area*prms_inch2mf_q
          if ( Soil_saturated(hru_id) == 1 ) aet = pet
          pettotal = pettotal + pet
          aettotal = aettotal + aet
@@ -2805,6 +2841,8 @@
       factor = set_factor(l, aetold, pettotal, aettotal, sup, supold,
      +                    kper, kstp, kiter)
       QONLYOLD(l) = QONLY(L)
+      RMSEGW(L) = SQRT((aetold - aettotal)**dtwo)
+      IF ( RMSEGW(L) > zerod2*pettotal )AGCONVERGE = 0
       AETITERGW(l) = sngl(aettotal)
       QONLY(L) = QONLY(L) + sngl(factor)
       if (QONLY(L) < 0.0) QONLY(L) = 0.0
@@ -2846,7 +2884,7 @@
       if( factor > accel*etdif ) factor = accel*etdif
       if( factor < etdif ) factor = etdif
       if( factor < dzero ) factor = dzero
-!      if(l==18.and.kper==22.and.kstp==21)then
+!      if(l==800)then
 !      write(222,333)kiter,pettotal,aettotal,dq,det,aettotal,
 !     +aetold,factor,sup
 !      end if
@@ -2865,7 +2903,8 @@
       USE GLOBAL, ONLY: DELR, DELC
       USE GWFBASMODULE, ONLY: DELT
       USE PRMS_BASIN, ONLY: HRU_PERV
-      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+!      USE PRMS_FLOWVARS, ONLY: HRU_ACTET
+      USE PRMS_SOILZONE, ONLY: PERV_ACTET
       USE PRMS_CLIMATEVARS, ONLY: POTET
       USE PRMS_MODULE, ONLY: GSFLOW_flag
       USE PRMS_MODULE, ONLY: Nhru, Nhrucell, Gvr_cell_id
@@ -2927,7 +2966,7 @@
                      hru_id = IRRROW_SW(k, iseg)
                      area = HRU_PERV(hru_id)
                      pet = potet(hru_id)*area*prms_inch2mf_q
-                     aet = hru_actet(hru_id)*area*prms_inch2mf_q
+                     aet = perv_actet(hru_id)*area*prms_inch2mf_q
                      if ( Nhru==Nhrucell ) then
                        icell = Gvr_cell_id(hru_id)
                        irow = Gwc_row(icell)
@@ -2992,7 +3031,7 @@
                            hru_id = IRRROW_GW(J, L)
                            area = HRU_PERV(hru_id)
                            pet = potet(hru_id)*area*prms_inch2mf_q
-                           aet = hru_actet(hru_id)*area*prms_inch2mf_q
+                           aet = perv_actet(hru_id)*area*prms_inch2mf_q
                            if ( Nhru==Nhrucell ) then
                              icell = Gvr_cell_id(hru_id)
                              irow = Gwc_row(icell)
@@ -3042,7 +3081,7 @@
                      hru_id = IRRROW_GW(J, L)
                      area = HRU_PERV(hru_id)
                      pet = potet(hru_id)*area*prms_inch2mf_q
-                     aet = hru_actet(hru_id)*area*prms_inch2mf_q
+                     aet = perv_actet(hru_id)*area*prms_inch2mf_q
                      if ( Nhru==Nhrucell ) then
                        icell = Gvr_cell_id(hru_id)
                        irow = Gwc_row(icell)
@@ -3213,23 +3252,23 @@
       !
       ! SPECIFICATIONS:
       ! - -----------------------------------------------------------------
+      INTEGER, INTENT(IN) :: MSUM, IOUT, KSTP, KPER
       CHARACTER*22 VBNMAG(MSUM)
       DIMENSION VBVLAG(4, MSUM)
       CHARACTER*17 VAL1, VAL2
+      INTEGER MSUM1, L
+      REAL BUDPERC, TOTRIN, TOTROT, TOTVIN, TOTVOT, VBVLAG
+      REAL DIFFR, ADIFFR, PDIFFR, AVGRAT, DIFFV, ADIFFV, PDIFFV, AVGVOL
+      REAL, PARAMETER :: ZERO = 0.0, TWO = 2.0, SMALL = 0.1, HUND = 100.
+      REAL, PARAMETER :: BIGVL1 = 9.99999E11, BIGVL2 = 9.99999E10
       ! - -----------------------------------------------------------------
       !
       !1 - -----DETERMINE NUMBER OF INDIVIDUAL BUDGET ENTRIES.
       BUDPERC = 0.
       MSUM1 = MSUM - 1
-      IF (MSUM1 .LE. 0) RETURN
+      IF (MSUM1 < 1) RETURN
       !
       !2 - -----CLEAR RATE AND VOLUME ACCUMULATORS.
-      ZERO = 0.
-      TWO = 2.
-      HUND = 100.
-      BIGVL1 = 9.99999E11
-      BIGVL2 = 9.99999E10
-      SMALL = 0.1
       TOTRIN = ZERO
       TOTROT = ZERO
       TOTVIN = ZERO
@@ -3457,5 +3496,9 @@
       DEALLOCATE(SEGLIST)
       DEALLOCATE(NUMSEGLIST)
       DEALLOCATE(ACCEL)
+      DEALLOCATE(AETITERGW)
+      DEALLOCATE(AETITERSW)
+      DEALLOCATE(RMSESW)
+      DEALLOCATE(RMSEGW)
       RETURN
       END

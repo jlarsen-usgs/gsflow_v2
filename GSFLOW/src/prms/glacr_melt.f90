@@ -45,16 +45,15 @@
 !***********************************************************************
 
       MODULE PRMS_GLACR
-      USE PRMS_CONSTANTS, ONLY: ON, OFF, DOCUMENTATION, MONTHS_PER_YEAR, GLACIER, LAND, &
-     &    FEET2METERS, METERS2FEET, DNEARZERO, NEARZERO, FEET, METERS, MAX_DAYS_PER_YEAR, &
-     &    RUN, SETDIMENS, DECL, INIT, CLEAN, ON
-      USE PRMS_MODULE, ONLY: Process_flag, Nhru, Model, Init_vars_from_file, Save_vars_to_file
+      USE PRMS_CONSTANTS, ONLY: ACTIVE, OFF, DOCUMENTATION, MONTHS_PER_YEAR, GLACIER, LAND, &
+     &    FEET2METERS, METERS2FEET, DNEARZERO, NEARZERO, FEET, METERS, MAX_DAYS_PER_YEAR
+      USE PRMS_MODULE, ONLY: Nhru, Model, Init_vars_from_file
       IMPLICIT NONE
       !****************************************************************
       !   Local Variables
       character(len=*), parameter :: MODDESC = 'Glacier Dynamics'
       character(len=10), parameter :: MODNAME = 'glacr_melt'
-      character(len=*), parameter :: Version_glacr = '2020-08-04'
+      character(len=*), parameter :: Version_glacr = '2020-12-02'
       ! Ngl - Number of glaciers counted by termini
       ! Ntp - Number of tops of glaciers, so max glaciers that could ever split in two
       ! Nhrugl - Number of at least partially glacierized hrus at initiation
@@ -97,7 +96,8 @@
 !     Main glacr routine
 !***********************************************************************
       INTEGER FUNCTION glacr()
-      USE PRMS_GLACR
+      USE PRMS_CONSTANTS, ONLY: ACTIVE, RUN, SETDIMENS, DECL, INIT, CLEAN
+      USE PRMS_MODULE, ONLY: Process_flag, Save_vars_to_file
       IMPLICIT NONE
 ! Functions
       INTEGER, EXTERNAL :: glacrdecl, glacrinit, glacrrun, glacrsetdims
@@ -114,7 +114,7 @@
       ELSEIF ( Process_flag==INIT ) THEN
         glacr = glacrinit()
       ELSEIF ( Process_flag==CLEAN ) THEN
-        IF ( Save_vars_to_file==ON ) CALL glacr_restart(0)
+        IF ( Save_vars_to_file==ACTIVE ) CALL glacr_restart(0)
       ENDIF
 
       END FUNCTION GLACR
@@ -167,15 +167,15 @@
      &     'decimal fraction', Hru_slope_ts)/=0 ) CALL read_error(3, 'hru_slope_ts')
 
       IF ( declvar(MODNAME, 'basin_gl_top_melt', 'one', 1, 'double',     &
-     &     'Basin area-weighted glacier surface melt (snow, ice and rain) coming out of termini of all glaciers and glrettes', &
+     &     'Basin area-weighted glacier surface melt (snow, ice and rain) coming out of termini of all glaciers and glacierettes', &
      &     'inches', Basin_gl_top_melt)/=0 ) CALL read_error(3, 'basin_gl_top_melt')
 
       IF ( declvar(MODNAME, 'basin_gl_top_gain', 'one', 1, 'double', &
-     &     'Basin area-weighted glacier surface gain (snow and rain minus evap) for all glaciers and glrettes', &
+     &     'Basin area-weighted glacier surface gain (snow and rain minus evaporation) for all glaciers and glacierettes', &
      &     'inches', Basin_gl_top_gain)/=0 ) CALL read_error(3, 'basin_gl_top_gain')
 
       IF ( declvar(MODNAME, 'basin_gl_ice_melt', 'one', 1, 'double',    &
-     &     'Basin area-weighted glacier ice (firn) melt coming out of termini of all glaciers and glrettes', &
+     &     'Basin area-weighted glacier ice (firn) melt coming out of termini of all glaciers and glacierettes', &
      &     'inches', Basin_gl_ice_melt)/=0 ) CALL read_error(3, 'basin_gl_ice_melt')
 
       ALLOCATE ( Gl_mb_yrcumul(Nhru) )
@@ -219,17 +219,17 @@
 
       ALLOCATE ( Top_tag(Nhru) )
       IF ( declvar(MODNAME, 'top_tag', 'nhru', Nhru, 'integer',         &
-     &     'Identifies which glacier top this HRU is fed by. If =-1, then has multiple feeders', &
+     &     'Identifies which glacier top each HRU is fed by. If =-1, then has multiple feeders', &
      &     'none', Top_tag)/=0 ) CALL read_error(3, 'top_tag')
 
       ALLOCATE ( Glacr_tag(Nhru) )
       IF ( declvar(MODNAME, 'glacr_tag', 'nhru', Nhru, 'integer',       &
-     &     'Identifies which glacier this HRU belongs to',              &
+     &     'Identifies which glacier each HRU belongs to',              &
      &     'none', Glacr_tag)/=0 ) CALL read_error(3, 'glacr_tag')
 
       ALLOCATE ( Prev_area(Nhru) )
       IF ( declvar(MODNAME, 'prev_area', 'nhru', Nhru, 'double',        &
-     &     'Previous year glacier-covered area above this HRU where all branches of the glacier are included', &
+     &     'Previous year glacier-covered area above each HRU where all branches of the glacier are included', &
      &     'inches squared', Prev_area)/=0 ) CALL read_error(3, 'prev_area')
 
       ALLOCATE ( Prev_vol(Nhru) )
@@ -249,7 +249,7 @@
 
       ALLOCATE ( Order_flowline(Nhru) )
       IF ( declvar(MODNAME, 'order_flowline', 'nhru', Nhru, 'integer',  &
-     &     'Order flowlines belong together as glaciers, Ntp of these', &
+     &     'Order of flowlines that belong together as glaciers, Ntp of these', &
      &     'none', Order_flowline)/=0 ) CALL read_error(3, 'order_flowline')
 
       ALLOCATE ( Ode_glacrva_coef(Nhru) )
@@ -319,7 +319,7 @@
 
       ALLOCATE ( Basal_slope(Nhru) )
       IF ( declvar(MODNAME, 'basal_slope', 'nhru', Nhru, 'real',        &
-     &     'Glacier basal slope down flowline mean over HRU', &
+     &     'Glacier basal slope down flowline mean over each HRU', &
      &     'decimal fraction', Basal_slope)/=0 ) CALL read_error(3, 'basal_slope')
 
       ALLOCATE ( Av_basal_slope(Nhru) )
@@ -380,14 +380,14 @@
       IF ( declparam(MODNAME, 'glacrva_coef', 'nhru', 'real', &
            '0.28', '0.01', '2.0', &
            'Volume area scaling coefficient for glaciers with Luthi 2009', &
-           'Volume area scaling coefficient for glaciers make average by region', &
+           'Volume area scaling coefficient for glaciers, average value by region', &
            'm**(3-2*glacrva_exp)')/=0 ) CALL read_error(1, 'glacrva_coef')
 
       ALLOCATE ( Glacrva_exp(Nhru) )
       IF ( declparam(MODNAME, 'glacrva_exp', 'nhru', 'real', &
            '1.375', '1.0', '2.0', &
            'Volume area exponential coefficient for glaciers', &
-           'Volume area exponential coefficient for glaciers make average by region', &
+           'Volume area exponential coefficient for glaciers, average value by region', &
            'none')/=0 ) CALL read_error(1, 'glacrva_exp')
 
       ALLOCATE ( Stor_ice(Nhru,MONTHS_PER_YEAR) )
@@ -432,7 +432,7 @@
            'Average HRU snowfield ablation zones elevation range or ~ median-min elev', &
            'elev_units')/=0 ) CALL read_error(1, 'abl_elev_range')
 
-       END FUNCTION glacrdecl
+      END FUNCTION glacrdecl
 
 !***********************************************************************
 !     glacrinit - Initialize glacr module - get parameter values
@@ -446,7 +446,7 @@
 ! Functions
       INTEGER, EXTERNAL :: getparam, get_ftnunit, compute_ela_aar
       INTRINSIC :: ABS, SQRT, SNGL, REAL
-      EXTERNAL :: read_error, tag_count, sort5
+      EXTERNAL :: read_error, tag_count, sort5, glacr_restart
 ! Local Variables
       INTEGER :: i, j, ii, jj, o, p, hru_flowline(Nhru), toflowline(Nhru), doela, termh, len_str
       INTEGER :: iwksp(Nhru), is(Nhru), ie(Nhru), n_inline(Nhru), cell_id(Nhru), str_id(Nhru), prev
@@ -871,7 +871,7 @@
 !***********************************************************************
       INTEGER FUNCTION comp_glsurf(glacr_exist, glrette_exist)
       USE PRMS_GLACR
-      USE PRMS_MODULE, ONLY: Nhru, Starttime
+      USE PRMS_MODULE, ONLY: Nhru, Start_year
       USE PRMS_BASIN, ONLY: Hru_type, Hru_elev_ts, Basin_area_inv, Active_hrus, &
      &    Hru_route_order, Elev_units, Hru_elev
       USE PRMS_SET_TIME, ONLY: Nowyear, Nowmonth, Julwater
@@ -935,7 +935,7 @@
       gl_gain = 0.D0
 !
 ! Start of year calculations after have a year of data
-      IF ( Julwater==1 .AND. Nowyear>=Starttime(1)+1) THEN
+      IF ( Julwater==1 .AND. Nowyear>=Start_year+1) THEN
         IF (glacr_exist==1 ) THEN !have glaciers
 ! Save year ending values from previous year
           DO jj = 1, Active_hrus
@@ -961,7 +961,7 @@
             frawt(i) = fraw0(i)/divu !in km
           ENDDO
 ! Have a year of mass balance, compute bottom so can do Hru_elev_ts
-          IF ( Nowyear==Starttime(1)+1) THEN ! do bottom calcs and get ca
+          IF ( Nowyear==Start_year+1) THEN ! do bottom calcs and get ca
             ALL_unit = get_ftnunit(735)
             Output_unit = get_ftnunit(All_unit)
             IF (botwrite==1) OPEN ( Output_unit, FILE='output.dat' )
@@ -1060,7 +1060,7 @@
 !
 !After first year estimate Glacrva_coef based on ODE volume and area, ca = Vol/(Area**Glacrva_exp)
 ! ca = (Glacrva_coef*39.37**(3.0-2.0*Glacrva_exp))*(Av_fgrad(p)**(0.2))*(Av_basal_slope(p)**(-0.4))
-          IF ( Nowyear==Starttime(1)+1) THEN ! do bottom calcs and get ca
+          IF ( Nowyear==Start_year+1) THEN ! do bottom calcs and get ca
             IF (botwrite==1) WRITE ( Output_unit, '(A6,A11,A15)' ) 'Glacr', 'Term_HRU_i', 'Gl_area_init'
             DO o = 1, Ngl
               p = Glacr_tag(Term(o)) !index by Glacr_tag
@@ -1355,7 +1355,7 @@
 !Snowfield area change uses Baumann and Winkler 2010 to change area every 10 years;
 ! technically each snowfield should have own ablation elevation range.
         IF (glrette_exist==1) THEN !have snowfields,
-          IF ( MOD(Nowyear-Starttime(1),10)==0 ) THEN !change them
+          IF ( MOD(Nowyear-Start_year,10)==0 ) THEN !change them
             DO i = 1, Active_hrus
               j = Hru_route_order(i)
               IF ( Hru_type(j)==LAND .AND. Glrette_frac(j)>NEARZERO) THEN

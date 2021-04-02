@@ -3,20 +3,20 @@
 ! from files pre-processed Data Files available for other PRMS modules
 !***********************************************************************
       MODULE PRMS_WATER_USE
-      USE PRMS_CONSTANTS, ONLY: DOCUMENTATION, MAXFILE_LENGTH, ON, OFF, &
+      USE PRMS_CONSTANTS, ONLY: DOCUMENTATION, MAXFILE_LENGTH, ACTIVE, OFF, &
      &    RUN, DECL, INIT, CLEAN, ERROR_water_use, strmflow_noroute_module, &
      &    strmflow_muskingum_lake_module
       USE PRMS_MODULE, ONLY: Process_flag, Nhru, Nsegment, Nwateruse, Nexternal, Nconsumed, &
      &    Segment_transferON_OFF, Gwr_transferON_OFF, Lake_transferON_OFF, &
      &    External_transferON_OFF, Dprst_transferON_OFF, Dprst_flag, Strmflow_flag, &
-     &    Model, Inputerror_flag, Start_year, Start_month, Start_day, &
+     &    Model, Inputerror_flag, Start_year, Start_month, Start_day, Soilzone_add_water_use, &
      &    End_year, End_month, End_day, Dprst_transfer_water_use, Dprst_add_water_use, &
      &    Gwr_transfer_water_use, Gwr_add_water_use, Lake_transfer_water_use, Lake_add_water_use
       IMPLICIT NONE
       ! Local Variables
       character(len=*), parameter :: MODDESC = 'Time Series Data'
       character(len=*), parameter :: MODNAME = 'water_use_read'
-      character(len=*), parameter :: Version_water_use_read = '2020-08-31'
+      character(len=*), parameter :: Version_water_use_read = '2021-02-18'
 
       ! transfer type
       integer, parameter :: STREAM = 1
@@ -34,7 +34,7 @@
       DOUBLE PRECISION, SAVE ::  Total_consumed_gain
       REAL, ALLOCATABLE, SAVE :: Consumed_gain(:), Consumed_gain_tot(:)
       DOUBLE PRECISION, SAVE ::  Total_soilzone_gain
-      REAL, ALLOCATABLE, SAVE :: Soilzone_gain(:), Soilzone_gain_tot(:)
+      REAL, ALLOCATABLE, SAVE :: Soilzone_gain(:), Soilzone_gain_tot(:), Soilzone_gain_hru(:)
       DOUBLE PRECISION, SAVE :: Total_dprst_transfer, Total_dprst_gain
       REAL, ALLOCATABLE, SAVE :: Dprst_transfer(:), Dprst_gain(:), Dprst_transfer_tot(:), Dprst_gain_tot(:)
       DOUBLE PRECISION, SAVE :: Total_gwr_transfer, Total_gwr_gain
@@ -56,7 +56,6 @@
 
       INTEGER FUNCTION water_use_read()
       USE PRMS_WATER_USE
-      USE PRMS_MODULE, ONLY: Soilzone_add_water_use
       IMPLICIT NONE
 ! Functions
       INTRINSIC :: SNGL, DBLE
@@ -75,60 +74,65 @@
       INTEGER, SAVE :: lake_next_year, lake_next_month, lake_next_day
       DOUBLE PRECISION :: transfer_rate_dble !, factor
 !***********************************************************************
+      ! Types
+      ! (1) stream segments; (2) groundwater reservoirs; (3) surface-depression storage;
+      ! (4) external locations; (5) lakes; (6) capillary reservoir of the soil zone;
+      ! (7) internal consumptive-use locations; and (8) plant canopy. 
+!***********************************************************************
       water_use_read = 0
 
       IF ( Process_flag==RUN ) THEN
-        IF ( External_transferON_OFF==ON ) THEN
+        IF ( External_transferON_OFF==ACTIVE ) THEN
           CALL read_event(external_unit, EXTRNAL, external_next_year, external_next_month, external_next_day)
           Total_external_transfer = 0.0D0
           External_transfer = 0.0
         ENDIF
-        IF ( External_transfers_on==ON ) THEN
+        IF ( External_transfers_on==ACTIVE ) THEN
           Total_external_gain = 0.0D0
           External_gain = 0.0
         ENDIF
 
-        IF ( Gwr_transferON_OFF==ON ) THEN
+        IF ( Gwr_transferON_OFF==ACTIVE ) THEN
           CALL read_event(gwr_unit, GROUNDWATER, gwr_next_year, gwr_next_month, gwr_next_day)
           Total_gwr_transfer = 0.0D0
           Gwr_transfer = 0.0
         ENDIF
-        IF ( Gwr_transfers_on==ON ) THEN
+        IF ( Gwr_transfers_on==ACTIVE ) THEN
           Total_gwr_gain = 0.0D0
           Gwr_gain = 0.0
         ENDIF
 
-        IF ( Dprst_transferON_OFF==ON ) THEN
+        IF ( Dprst_transferON_OFF==ACTIVE ) THEN
           CALL read_event(dprst_unit, DPRST, dprst_next_year, dprst_next_month, dprst_next_day)
           Total_dprst_transfer = 0.0D0
           Dprst_transfer = 0.0
         ENDIF
-        IF ( Dprst_transfers_on==ON ) THEN
+        IF ( Dprst_transfers_on==ACTIVE ) THEN
           Total_dprst_gain = 0.0D0
           Dprst_gain = 0.0
         ENDIF
 
-        IF ( Segment_transferON_OFF==ON ) THEN
+        IF ( Segment_transferON_OFF==ACTIVE ) THEN
           CALL read_event(segment_unit, STREAM, segment_next_year, segment_next_month, segment_next_day)
           Total_segment_transfer = 0.0D0
           Segment_transfer = 0.0
         ENDIF
-        IF ( Segment_transfers_on==ON ) THEN
+        IF ( Segment_transfers_on==ACTIVE ) THEN
           Total_segment_gain = 0.0D0
           Segment_gain = 0.0
         ENDIF
           
-        IF ( Lake_transferON_OFF==ON ) THEN
+        IF ( Lake_transferON_OFF==ACTIVE ) THEN
           CALL read_event(lake_unit, LAKE, lake_next_year, lake_next_month, lake_next_day)
           Total_lake_transfer = 0.0D0
           Lake_transfer = 0.0
         ENDIF
-        IF ( Lake_transfers_on==ON ) THEN
+        IF ( Lake_transfers_on==ACTIVE ) THEN
           Total_lake_gain = 0.0D0
           Lake_gain = 0.0
         ENDIF
 
-        IF ( Consumed_transfers_on==ON ) THEN
+        IF ( Consumed_transfers_on==ACTIVE ) THEN
           Total_consumed_gain = 0.0D0
           Consumed_gain = 0.0
         ENDIF
@@ -146,37 +150,37 @@
           transfer_rate_dble = DBLE( Transfer_rate(i) )
           Total_transfers = Total_transfers + transfer_rate_dble
 
-          IF ( Gwr_transfers_on==ON ) THEN
+          IF ( Gwr_transfers_on==ACTIVE ) THEN
             IF ( Source_type(i)==GROUNDWATER ) THEN
               Gwr_transfer(id_src) = Gwr_transfer(id_src) + Transfer_rate(i)
               Gwr_transfer_tot(id_src) = Gwr_transfer_tot(id_src) + Transfer_rate(i)
               Total_gwr_transfer = Total_gwr_transfer + transfer_rate_dble
-              Gwr_transfer_water_use = ON
+              Gwr_transfer_water_use = ACTIVE
             ENDIF
             IF ( Destination_type(i)==GROUNDWATER ) THEN
               Gwr_gain(id_dest) = Gwr_gain(id_dest) + Transfer_rate(i)
               Gwr_gain_tot(id_dest) = Gwr_gain_tot(id_dest) + Transfer_rate(i)
               Total_gwr_gain = Total_gwr_gain + transfer_rate_dble
-              Gwr_add_water_use = ON
+              Gwr_add_water_use = ACTIVE
             ENDIF
           ENDIF
 
-          IF ( Dprst_transfers_on==ON ) THEN
+          IF ( Dprst_transfers_on==ACTIVE ) THEN
             IF ( Source_type(i)==DPRST ) THEN
               Dprst_transfer(id_src) = Dprst_transfer(id_src) + Transfer_rate(i)
               Dprst_transfer_tot(id_src) = Dprst_transfer_tot(id_src) + Transfer_rate(i)
               Total_dprst_transfer = Total_dprst_transfer + transfer_rate_dble
-              Dprst_transfer_water_use = ON
+              Dprst_transfer_water_use = ACTIVE
             ENDIF
             IF ( Destination_type(i)==DPRST ) THEN
               Dprst_gain(id_dest) = Dprst_gain(id_dest) + Transfer_rate(i)
               Dprst_gain_tot(id_dest) = Dprst_gain_tot(id_dest) + Transfer_rate(i)
               Total_dprst_gain = Total_dprst_gain + transfer_rate_dble
-              Dprst_add_water_use = ON
+              Dprst_add_water_use = ACTIVE
             ENDIF
           ENDIF
 
-          IF ( Segment_transfers_on==ON ) THEN
+          IF ( Segment_transfers_on==ACTIVE ) THEN
             IF ( Source_type(i)==STREAM ) THEN
               Segment_transfer(id_src) = Segment_transfer(id_src) + Transfer_rate(i)
               Segment_transfer_tot(id_src) = Segment_transfer_tot(id_src) + Transfer_rate(i)
@@ -189,22 +193,22 @@
             ENDIF
           ENDIF
 
-          IF ( Lake_transfers_on==ON ) THEN
+          IF ( Lake_transfers_on==ACTIVE ) THEN
             IF ( Source_type(i)==LAKE ) THEN
               Lake_transfer(id_src) = Lake_transfer(id_src) + Transfer_rate(i)
               Lake_transfer_tot(id_src) = Lake_transfer_tot(id_src) + Transfer_rate(i)
               Total_lake_transfer = Total_lake_transfer + transfer_rate_dble
-              Lake_transfer_water_use = ON
+              Lake_transfer_water_use = ACTIVE
             ENDIF
             IF ( Destination_type(i)==STREAM ) THEN
               Lake_gain(id_dest) = Lake_gain(id_dest) + Transfer_rate(i)
               Lake_gain_tot(id_dest) = Lake_gain_tot(id_dest) + Transfer_rate(i)
               Total_lake_gain = Total_lake_gain + transfer_rate_dble
-              Lake_add_water_use = ON
+              Lake_add_water_use = ACTIVE
             ENDIF
           ENDIF
 
-          IF ( External_transfers_on==ON ) THEN
+          IF ( External_transfers_on==ACTIVE ) THEN
             IF ( Source_type(i)==EXTRNAL ) THEN
               External_transfer(id_src) = External_transfer(id_src) + Transfer_rate(i)
               External_transfer_tot(id_src) = External_transfer_tot(id_src) + Transfer_rate(i)
@@ -217,7 +221,7 @@
             ENDIF
           ENDIF
 
-          IF ( Consumed_transfers_on==ON ) THEN
+          IF ( Consumed_transfers_on==ACTIVE ) THEN
             IF ( Destination_type(i)==CONSUMPTIVE ) THEN
               Consumed_gain(id_dest) = Consumed_gain(id_dest) + Transfer_rate(i)
               Consumed_gain_tot(id_dest) = Consumed_gain_tot(id_dest) + Transfer_rate(i)
@@ -229,7 +233,7 @@
             Soilzone_gain(id_dest) = Soilzone_gain(id_dest) + Transfer_rate(i)
             Soilzone_gain_tot(id_dest) = Soilzone_gain_tot(id_dest) + Transfer_rate(i)
             Total_soilzone_gain = Total_soilzone_gain + transfer_rate_dble
-            Soilzone_add_water_use = ON
+            Soilzone_add_water_use = ACTIVE
           ENDIF
 
           IF ( Destination_type(i)==CANOPY ) THEN
@@ -243,9 +247,9 @@
         CALL print_module(MODDESC, MODNAME, Version_water_use_read)
 
         Dprst_transfers_on = OFF
-        IF ( Dprst_flag==ON .OR. Model==DOCUMENTATION ) THEN
-          IF ( Dprst_transferON_OFF==ON .OR. Model==DOCUMENTATION ) THEN
-            Dprst_transfers_on = ON
+        IF ( Dprst_flag==ACTIVE .OR. Model==DOCUMENTATION ) THEN
+          IF ( Dprst_transferON_OFF==ACTIVE .OR. Model==DOCUMENTATION ) THEN
+            Dprst_transfers_on = ACTIVE
             ALLOCATE ( Dprst_transfer(Nhru) )
             IF ( declvar(MODNAME, 'dprst_transfer', 'nhru', Nhru, 'real', &
      &           'Transfer flow rate from surface-depression storage for each HRU for each time step', &
@@ -260,24 +264,24 @@
           ENDIF
           ALLOCATE ( Dprst_gain(Nhru) )
           IF ( declvar(MODNAME, 'dprst_gain', 'nhru', Nhru, 'real', &
-     &         'Transfer gain to surface-depression storage for each HRU for each time step', &
+     &         'Transfer gains to surface-depression storage for each HRU for each time step', &
      &         'cfs', Dprst_gain)/=0 ) CALL read_error(1, 'dprst_gain')
           ALLOCATE ( Dprst_gain_tot(Nhru) )
           IF ( declvar(MODNAME, 'dprst_gain_tot', 'nhru', Nhru, 'real', &
-     &         'Transfer gain to surface-depression storage for each HRU for the simulation', &
+     &         'Transfer gains to surface-depression storage for each HRU for the simulation', &
      &         'cfs', Dprst_gain_tot)/=0 ) CALL read_error(1, 'dprst_gain_tot')
           IF ( declvar(MODNAME, 'total_dprst_gain', 'one', 1, 'double', &
      &         'Transfer gains to all surface-depression storage for each time step', &
      &         'cfs', Total_dprst_gain)/=0 ) CALL read_error(1, 'total_dprst_gain')
-        ELSEIF ( Dprst_transferON_OFF==ON .AND. Model/=DOCUMENTATION ) THEN
+        ELSEIF ( Dprst_transferON_OFF==ACTIVE .AND. Model/=DOCUMENTATION ) THEN
           PRINT *, 'ERROR, specified to transfer water from surface-depression storage when dprst_flag = 0'
           Inputerror_flag = 1
         ENDIF
 
         Segment_transfers_on = OFF
         IF ( Strmflow_flag>strmflow_noroute_module .OR. Model==DOCUMENTATION ) THEN
-          IF ( Segment_transferON_OFF==ON .OR. Model==DOCUMENTATION ) THEN
-            Segment_transfers_on = ON
+          IF ( Segment_transferON_OFF==ACTIVE .OR. Model==DOCUMENTATION ) THEN
+            Segment_transfers_on = ACTIVE
             ALLOCATE ( Segment_transfer(Nsegment) )
             IF ( declvar(MODNAME, 'segment_transfer', 'nsegment', Nsegment, 'real', &
      &           'Transfer flow rate from each stream segment for each time step', &
@@ -292,23 +296,23 @@
           ENDIF
           ALLOCATE ( Segment_gain(Nsegment) )
           IF ( declvar(MODNAME, 'segment_gain', 'nsegment', Nsegment, 'real', &
-     &         'Transfer gain for each stream segment for each time step', &
+     &         'Transfer gains for each stream segment for each time step', &
      &         'cfs', Segment_gain)/=0 ) CALL read_error(1, 'segment_gain')
           ALLOCATE ( Segment_gain_tot(Nsegment) )
           IF ( declvar(MODNAME, 'segment_gain_tot', 'nsegment', Nsegment, 'real', &
-     &         'Transfer gain for each stream segment for the simulation', &
+     &         'Transfer gains for each stream segment for the simulation', &
      &         'cfs', Segment_gain_tot)/=0 ) CALL read_error(1, 'segment_gain_tot')
           IF ( declvar(MODNAME, 'total_segment_gain', 'one', 1, 'double', &
      &         'Transfer gains to all stream segments for each time step', &
      &         'cfs', Total_segment_gain)/=0 ) CALL read_error(1, 'total_segment_gain')
-        ELSEIF ( Segment_transferON_OFF==ON .AND. Model/=DOCUMENTATION ) THEN
+        ELSEIF ( Segment_transferON_OFF==ACTIVE .AND. Model/=DOCUMENTATION ) THEN
           PRINT *, 'ERROR, specified to transfer water from stream segments when they are not present'
           Inputerror_flag = 1
         ENDIF
 
         Gwr_transfers_on = OFF
-        IF ( Gwr_transferON_OFF==ON .OR. Model==DOCUMENTATION ) THEN
-          Gwr_transfers_on = ON
+        IF ( Gwr_transferON_OFF==ACTIVE .OR. Model==DOCUMENTATION ) THEN
+          Gwr_transfers_on = ACTIVE
           ALLOCATE ( Gwr_transfer(Nhru) )
           IF ( declvar(MODNAME, 'gwr_transfer', 'nhru', Nhru, 'real', &
      &         'Transfer flow rate from the groundwater reservoir of each HRU for each time step', &
@@ -323,11 +327,11 @@
         ENDIF
         ALLOCATE ( Gwr_gain(Nhru) )
         IF ( declvar(MODNAME, 'gwr_gain', 'nhru', Nhru, 'real', &
-     &       'Transfer gain to the groundwater reservoir of each HRU for each time step', &
+     &       'Transfer gains to the groundwater reservoir of each HRU for each time step', &
      &       'cfs', Gwr_gain)/=0 ) CALL read_error(1, 'gwr_gain')
         ALLOCATE ( Gwr_gain_tot(Nhru) )
         IF ( declvar(MODNAME, 'gwr_gain_tot', 'nhru', Nhru, 'real', &
-     &       'Transfer gain to the groundwater reservoir of each HRU for the simulation', &
+     &       'Transfer gains to the groundwater reservoir of each HRU for the simulation', &
      &       'cfs', Gwr_gain_tot)/=0 ) CALL read_error(1, 'gwr_gain_tot')
         IF ( declvar(MODNAME, 'total_gwr_gain', 'one', 1, 'double', &
      &       'Flow to all groundwater reservoirs for each time step', &
@@ -335,8 +339,8 @@
 
         Lake_transfers_on = OFF
         IF ( Strmflow_flag==strmflow_muskingum_lake_module .OR. Model==DOCUMENTATION ) THEN
-          IF ( Lake_transferON_OFF==ON .OR. Model==DOCUMENTATION ) THEN
-            Lake_transfers_on = ON
+          IF ( Lake_transferON_OFF==ACTIVE .OR. Model==DOCUMENTATION ) THEN
+            Lake_transfers_on = ACTIVE
             ALLOCATE ( Lake_transfer(Nhru) )
             IF ( declvar(MODNAME, 'lake_transfer', 'nhru', Nhru, 'real', &
      &           'Transfer flow rate from each lake HRU for each time step', &
@@ -351,23 +355,23 @@
           ENDIF
           ALLOCATE ( Lake_gain(Nhru) )
           IF ( declvar(MODNAME, 'lake_gain', 'nhru', Nhru, 'real', &
-     &         'Transfer gain to each lake HRU for each time step', &
+     &         'Transfer gains to each lake HRU for each time step', &
      &         'cfs', Lake_gain)/=0 ) CALL read_error(1, 'lake_gain')
           ALLOCATE ( Lake_gain_tot(Nhru) )
           IF ( declvar(MODNAME, 'lake_gain_tot', 'nhru', Nhru, 'real', &
-     &         'Transfer gain to each lake HRU for the simulation', &
+     &         'Transfer gains to each lake HRU for the simulation', &
      &         'cfs', Lake_gain_tot)/=0 ) CALL read_error(1, 'lake_gain_tot')
           IF ( declvar(MODNAME, 'total_lake_gain', 'one', 1, 'double', &
      &         'Transfer gains to all lake HRUs for each time step', &
      &         'cfs', Total_lake_gain)/=0 ) CALL read_error(1, 'total_lake_gain')
-        ELSEIF ( Lake_transferON_OFF==ON .AND. Model/=DOCUMENTATION ) THEN
+        ELSEIF ( Lake_transferON_OFF==ACTIVE .AND. Model/=DOCUMENTATION ) THEN
           PRINT *, 'ERROR, specified to transfer water from lakes when lake module is not active'
           Inputerror_flag = 1
         ENDIF
 
         External_transfers_on = OFF
-        IF ( (External_transferON_OFF==ON.AND.Nexternal>0) .OR. Model==DOCUMENTATION ) THEN
-          External_transfers_on = ON
+        IF ( (External_transferON_OFF==ACTIVE.AND.Nexternal>0) .OR. Model==DOCUMENTATION ) THEN
+          External_transfers_on = ACTIVE
           ALLOCATE ( External_transfer(Nexternal) )
           IF ( declvar(MODNAME, 'external_transfer', 'nexternal', Nexternal, 'real', &
      &         'Transfer flow rate from each external source for each time step', &
@@ -383,11 +387,11 @@
         IF ( Nexternal>0 ) THEN
           ALLOCATE ( External_gain(Nexternal) )
           IF ( declvar(MODNAME, 'external_gain', 'nexternal', Nexternal, 'real', &
-     &         'Transfer gain to each external location for each time step', &
+     &         'Transfer gains to each external location for each time step', &
      &         'cfs', External_gain)/=0 ) CALL read_error(1, 'external_gain')
           ALLOCATE ( External_gain_tot(Nexternal) )
           IF ( declvar(MODNAME, 'external_gain_tot', 'nexternal', Nexternal, 'real', &
-     &         'Transfer gain to each external location for each time step', &
+     &         'Transfer gains to each external location for each time step', &
      &         'cfs', External_gain_tot)/=0 ) CALL read_error(1, 'external_gain_tot')
         ENDIF
         IF ( declvar(MODNAME, 'total_external_gain', 'one', 1, 'double', &
@@ -396,7 +400,7 @@
 
         Consumed_transfers_on = OFF
         IF ( Nconsumed>0 ) THEN
-          Consumed_transfers_on = ON
+          Consumed_transfers_on = ACTIVE
           ALLOCATE ( Consumed_gain(Nconsumed) )
           IF ( declvar(MODNAME, 'consumed_gain', 'nconsumed', Nconsumed, 'real', &
      &         'Transfer flow rate to each water-use comsumption destination for each time step', &
@@ -412,23 +416,27 @@
 
         ALLOCATE ( Soilzone_gain(Nhru) )
         IF ( declvar(MODNAME, 'soilzone_gain', 'nhru', Nhru, 'real', &
-     &       'Transfer gain to the capillary reservoir within the soilzone for each HRU for each time step', &
+     &       'Transfer gains to the capillary reservoir within the soilzone for each HRU for each time step', &
      &       'cfs', Soilzone_gain)/=0 ) CALL read_error(1, 'soilzone_gain')
         ALLOCATE ( Soilzone_gain_tot(Nhru) )
         IF ( declvar(MODNAME, 'soilzone_gain_tot', 'nhru', Nhru, 'real', &
-     &       'Transfer gain to the capillary reservoir within the soilzone for each HRU for the simulation', &
+     &       'Transfer gains to the capillary reservoir within the soilzone for each HRU for the simulation', &
      &       'cfs', Soilzone_gain_tot)/=0 ) CALL read_error(1, 'soilzone_gain_tot')
+        ALLOCATE ( Soilzone_gain_hru(Nhru) )
+        IF ( declvar(MODNAME, 'soilzone_gain_hru', 'nhru', Nhru, 'real', &
+     &       'Irrigation added to soilzone from water-use module for each HRU', &
+     &       'inches', Soilzone_gain_hru)/=0 ) CALL read_error(3, 'soilzone_gain_hru')
         IF ( declvar(MODNAME, 'total_soilzone_gain', 'one', 1, 'double', &
      &       'Transfer gains to all capillary reservoirs for each time step', &
      &       'cfs', Total_soilzone_gain)/=0 ) CALL read_error(1, 'total_soilzone_gain')
 
         ALLOCATE ( Canopy_gain(Nhru) )
         IF ( declvar(MODNAME, 'canopy_gain', 'nhru', Nhru, 'real', &
-     &       'Transfer gain to the canopy reservoir for each HRU for each time step', &
+     &       'Transfer gains to the canopy reservoir for each HRU for each time step', &
      &       'cfs', Canopy_gain)/=0 ) CALL read_error(1, 'canopy_gain')
         ALLOCATE ( Canopy_gain_tot(Nhru) )
         IF ( declvar(MODNAME, 'canopy_gain_tot', 'nhru', Nhru, 'real', &
-     &       'Transfer gain to the canopy reservoir for each HRU for the simulation', &
+     &       'Transfer gains to the canopy reservoir for each HRU for the simulation', &
      &       'cfs', Canopy_gain_tot)/=0 ) CALL read_error(1, 'canopy_gain_tot')
         IF ( declvar(MODNAME, 'total_canopy_gain', 'one', 1, 'double', &
      &       'Transfer gains to all canopy reservoirs for each time step', &
@@ -455,7 +463,7 @@
 10      FORMAT ( 'Water Use Summary File', /, 2(A, I5, 2('/',I2.2)), / ) 
 
         istop = 0
-        IF ( Segment_transferON_OFF==ON ) THEN ! type STREAM
+        IF ( Segment_transferON_OFF==ACTIVE ) THEN ! type STREAM
           IF ( control_string(Segment_transfer_file, 'segment_transfer_file')/=0 ) &
      &         CALL read_error(5, 'segment_transfer_file')
           CALL find_header_end(segment_unit, Segment_transfer_file, 'segment_transfer_file', ierr, 0, 0)
@@ -474,7 +482,7 @@
           Segment_gain_tot = 0.0
         ENDIF
 
-        IF ( Gwr_transferON_OFF==ON ) THEN ! type GROUNDWATER
+        IF ( Gwr_transferON_OFF==ACTIVE ) THEN ! type GROUNDWATER
           IF ( control_string(Gwr_transfer_file, 'gwr_transfer_file')/=0 ) &
      &         CALL read_error(5, 'gwr_transfer_file')
           CALL find_header_end(gwr_unit, Gwr_transfer_file, 'gwr_transfer_file', ierr, 0, 0)
@@ -492,7 +500,7 @@
         Gwr_gain_tot = 0.0
         Total_gwr_gain = 0.0D0
 
-        IF ( Dprst_transferON_OFF==ON ) THEN ! type DPRST
+        IF ( Dprst_transferON_OFF==ACTIVE ) THEN ! type DPRST
           IF ( control_string(Dprst_transfer_file, 'dprst_transfer_file')/=0 ) CALL read_error(5, 'dprst_transfer_file')
           CALL find_header_end(dprst_unit, Dprst_transfer_file, 'dprst_transfer_file', ierr, 0, 0)
           IF ( ierr==0 ) THEN
@@ -504,13 +512,13 @@
             istop = 1
           ENDIF
         ENDIF
-        IF ( Dprst_flag==ON ) THEN
+        IF ( Dprst_flag==ACTIVE ) THEN
           Dprst_gain = 0.0
           Dprst_gain_tot = 0.0
           Total_dprst_gain = 0.0D0
         ENDIF
 
-        IF ( External_transferON_OFF==ON ) THEN ! type EXTRNAL
+        IF ( External_transferON_OFF==ACTIVE ) THEN ! type EXTRNAL
           IF ( control_string(External_transfer_file, 'external_transfer_file')/=0 ) &
      &         CALL read_error(5, 'external_transfer_file')
           CALL find_header_end(external_unit, External_transfer_file, 'external_transfer_file', ierr, 0, 0)
@@ -530,7 +538,7 @@
           Total_external_gain = 0.0D0
         ENDIF
 
-        IF ( Lake_transferON_OFF==ON ) THEN ! Type LAKE
+        IF ( Lake_transferON_OFF==ACTIVE ) THEN ! Type LAKE
           IF ( control_string(Lake_transfer_file, 'lake_transfer_file')/=0 ) CALL read_error(5, 'lake_transfer_file')
           CALL find_header_end(lake_unit, Lake_transfer_file, 'lake_transfer_file', ierr, 0, 0)
           IF ( ierr==0 ) THEN
@@ -553,9 +561,10 @@
         ! type CAPILLARY
         Soilzone_gain = 0.0
         Soilzone_gain_tot = 0.0
+        Soilzone_gain_hru = 0.0
         Total_soilzone_gain = 0.0D0
 
-        IF ( Consumed_transfers_on==ON ) THEN ! type CONSUMPTIVE
+        IF ( Consumed_transfers_on==ACTIVE ) THEN ! type CONSUMPTIVE
           Consumed_gain = 0.0
           Consumed_gain_tot = 0.0
           Total_consumed_gain = 0.0D0
@@ -580,8 +589,9 @@
 ! Read event for a source type
 !*****************************
       SUBROUTINE read_event(Iunit, Src_type, Next_yr, Next_mo, Next_day)
+      USE PRMS_CONSTANTS, ONLY: ERROR_water_use, ACTIVE, OFF
+      USE PRMS_WATER_USE, ONLY: CANOPY
       USE PRMS_SET_TIME, ONLY: Nowyear, Nowmonth, Nowday
-      USE PRMS_WATER_USE, ONLY: ERROR_water_use, ON, OFF, CANOPY
       IMPLICIT NONE
 ! Arguments
       INTEGER, INTENT(IN) :: Iunit, Src_type
@@ -593,8 +603,8 @@
       REAL transfer
 !*******************************************************************************
       IF ( Next_mo==0 ) RETURN ! already found end of file
-      keep_reading = ON
-      DO WHILE ( keep_reading==ON )
+      keep_reading = ACTIVE
+      DO WHILE ( keep_reading==ACTIVE )
         IF ( Next_yr==Nowyear .AND. Next_mo==Nowmonth .AND. Next_day==Nowday ) THEN
           READ ( Iunit, * ) Next_yr, Next_mo, Next_day, src_id, dest_type, dest_id, transfer
           IF ( dest_type>CANOPY ) THEN
@@ -615,10 +625,11 @@
 ! check event for validity
 ! ****************************
       SUBROUTINE check_event(Src_type, Dest_type, Src_id, Dest_id, Ignore)
+      USE PRMS_CONSTANTS, ONLY: ERROR_water_use, ACTIVE, OFF, &
+          &    strmflow_muskingum_lake_module, strmflow_noroute_module
       USE PRMS_WATER_USE, ONLY: Outunit, Segment_transfers_on, Dprst_transfers_on, Lake_transfers_on, &
-     &    Consumed_transfers_on, External_transfers_on, Gwr_transfers_on, ERROR_water_use, ON, OFF, &
-     &    STREAM, GROUNDWATER, DPRST, EXTRNAL, LAKE, CAPILLARY, CONSUMPTIVE, CANOPY, &
-     &    strmflow_muskingum_lake_module, strmflow_noroute_module
+     &    Consumed_transfers_on, External_transfers_on, Gwr_transfers_on, &
+     &    STREAM, GROUNDWATER, DPRST, EXTRNAL, LAKE, CAPILLARY, CONSUMPTIVE, CANOPY
       USE PRMS_MODULE, ONLY: Segment_transferON_OFF, Gwr_transferON_OFF, Lake_transferON_OFF, &
      &    Dprst_transferON_OFF, External_transferON_OFF, Strmflow_flag, Nexternal, Dprst_flag
       USE PRMS_SET_TIME, ONLY: Nowyear, Nowmonth, Nowday
@@ -637,10 +648,10 @@
         CALL error_stop('Valid src_type values are 1 to 5', ERROR_water_use)
       ENDIF
       IF ( Src_type==STREAM ) THEN
-        IF ( Segment_transferON_OFF==0 ) THEN
+        IF ( Segment_transferON_OFF==OFF ) THEN
           PRINT *, 'Warning, specified a stream segment transfer, but segment_transferON_OFF=0, transfer ignored'
           Ignore = 1
-        ELSEIF ( Segment_transfers_on==0 ) THEN
+        ELSEIF ( Segment_transfers_on==OFF ) THEN
           CALL error_stop('specified a stream segment transfer, but stream segments not present in model', ERROR_water_use)
         ENDIF
       ENDIF
@@ -648,14 +659,14 @@
         IF ( Strmflow_flag==strmflow_noroute_module ) THEN
           CALL error_stop('specified a transfer to stream segment, but stream segments not present in model', ERROR_water_use)
         ELSE
-         Segment_transfers_on = ON
+         Segment_transfers_on = ACTIVE
         ENDIF
       ENDIF
       IF ( Src_type==EXTRNAL ) THEN
-        IF ( External_transferON_OFF==0 ) THEN
+        IF ( External_transferON_OFF==OFF ) THEN
           PRINT *, 'Warning, specified a external transfer, but external_transferON_OFF=0, transfer ignored'
           Ignore = 1
-        ELSEIF ( External_transfers_on==0 ) THEN
+        ELSEIF ( External_transfers_on==OFF ) THEN
           CALL error_stop('specified a external transfer, but external locations not present in model', ERROR_water_use)
         ENDIF
       ENDIF
@@ -663,7 +674,7 @@
         IF ( Nexternal==0 ) THEN
           CALL error_stop('specified a transfer to external location, but nexternal = 0', ERROR_water_use)
         ELSE
-          External_transfers_on = ON
+          External_transfers_on = ACTIVE
         ENDIF
       ENDIF
       IF ( Dest_type==CONSUMPTIVE ) THEN
@@ -677,7 +688,7 @@
           Ignore = 1
         ENDIF
       ENDIF
-      IF ( Dest_type==GROUNDWATER ) Gwr_transfers_on = ON
+      IF ( Dest_type==GROUNDWATER ) Gwr_transfers_on = ACTIVE
       IF ( Src_type==DPRST ) THEN
         IF ( Dprst_transferON_OFF==OFF ) THEN
           PRINT *, 'Warning, specified a external transfer, but dprst_transferON_OFF=0, transfer ignored'
@@ -690,7 +701,7 @@
         IF ( Dprst_flag==OFF ) THEN
           CALL error_stop('specified a transfer to depression storage, but dprst_flag = 0', ERROR_water_use)
         ELSE
-          Dprst_transfers_on = ON
+          Dprst_transfers_on = ACTIVE
         ENDIF
       ENDIF
       IF ( Src_type==LAKE ) THEN
@@ -705,7 +716,7 @@
         IF ( Strmflow_flag/=strmflow_muskingum_lake_module ) THEN
           CALL error_stop('specified a transfer to lake, but lake simulation is inactive', ERROR_water_use)
         ELSE
-          Lake_transfers_on = ON
+          Lake_transfers_on = ACTIVE
         ENDIF
       ENDIF
       IF ( Src_type==Dest_type .AND. Dest_id==Src_id ) THEN
@@ -798,7 +809,7 @@
       ELSEIF ( Dest_type==CANOPY ) THEN
         WRITE ( Outunit, '(A,1X,I0)' ) 'Canopy storage, HRU:', Dest_id
       ENDIF
-      WRITE ( Outunit, '(A,1X,F0.3)' ) 'Transfer flow rate:', Diversion
+      WRITE ( Outunit, '(A,1X,F0.5)' ) 'Transfer flow rate:', Diversion
       END SUBROUTINE check_transfer
 
       SUBROUTINE nwateruse_error(ctype)

@@ -47,7 +47,7 @@ long read_line (void) {
    /*static char err[80];*/
 
    char   *start_point, *end_point;
-   float   initial_deltat;
+   //float   initial_deltat;
    long   i,j;
    static int   start_of_data;
    static long	data_eof_flag;
@@ -55,7 +55,9 @@ long read_line (void) {
    FILE_DATA   *cur_fd;
    char   *err_ptr;
    static char *line = NULL;
-  
+   static long silent_flag;
+   silent_flag = *control_lvar("print_debug");
+
    if (line == NULL) {
 	   line = (char *) umalloc(max_data_ln_len * sizeof(char));
    }
@@ -63,7 +65,7 @@ long read_line (void) {
 /*
 **   get initial delta-t from control data base
 */
-   initial_deltat = *control_fvar("initial_deltat");
+ //  initial_deltat = *control_fvar("initial_deltat");
    data_eof_flag = *control_lvar ("ignore_data_file_end");
 
    if (Mnsteps == 0) {
@@ -87,8 +89,10 @@ long read_line (void) {
 **  9999 in the year field is the code for EOF. 
 */
       if (cur_fd->time.year == 9999) {
-		  (void)fprintf (stderr,"\nWARNING, date of end_time reached the last date in the Data File \n");
-		  (void)fprintf(stderr, "         simulation stopped on: %ld %ld %ld \n", Mnowtime->year, Mnowtime->month, Mnowtime->day);
+		  if (silent_flag > -2) {
+			  (void)fprintf(stderr, "\nWARNING, date of end_time reached the last date in the Data File \n");
+			  (void)fprintf(stderr, "         simulation stopped on: %ld %ld %ld \n", Mnowtime->year, Mnowtime->month, Mnowtime->day);
+		  }
 	      return ENDOFFILE;
 	  }
 
@@ -158,7 +162,8 @@ cur_fd->time = {year = 1956, month = 2, day = 19, hour = 0, min = 0, sec = 0,
       if (Mnowtime->jt >= Mstrttime->jt) {
          if (start_of_data) {
             start_of_data = 0;
-            Mprevjt = Mnowtime->jt - (double)(initial_deltat / 24.0);
+            //Mprevjt = Mnowtime->jt - (double)(initial_deltat / 24.0);
+			Mprevjt = Mnowtime->jt - (double)(1.0);
          }
 
          (void)strncpy (line, cur_fd->start_of_data, max_data_ln_len);
@@ -186,7 +191,7 @@ cur_fd->time = {year = 1956, month = 2, day = 19, hour = 0, min = 0, sec = 0,
 /*
 ** DANGER This hack is to come out of the storm
 */
-            (void)fprintf (stderr,"read_line:  comming out of storm. dt = 1 day\n");
+            (void)fprintf (stderr,"read_line:  coming out of storm. dt = 1 day\n");
             Mdeltat = 1.0;
             Mprevjt = Mnowtime->jt - Mdeltat;
 

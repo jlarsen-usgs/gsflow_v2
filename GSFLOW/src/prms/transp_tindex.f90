@@ -3,14 +3,15 @@
 ! based on a temperature index method.
 !***********************************************************************
       MODULE PRMS_TRANSP_TINDEX
-        USE PRMS_CONSTANTS, ONLY: RUN, DECL, INIT, CLEAN, ON, OFF, FAHRENHEIT, MONTHS_PER_YEAR
+        USE PRMS_CONSTANTS, ONLY: RUN, DECL, INIT, CLEAN, ACTIVE, OFF, FAHRENHEIT, MONTHS_PER_YEAR, &
+     &      READ_INIT, SAVE_INIT       
         USE PRMS_MODULE, ONLY: Process_flag, Nhru, Save_vars_to_file, Init_vars_from_file, &
      &      Start_month, Start_day
         IMPLICIT NONE
         ! Local Variables
         character(len=*), parameter :: MODDESC = 'Transpiration Distribution'
         character(len=13), parameter :: MODNAME = 'transp_tindex'
-        character(len=*), parameter :: Version_transp = '2020-09-14'
+        character(len=*), parameter :: Version_transp = '2020-12-02'
         INTEGER, SAVE, ALLOCATABLE :: Transp_check(:)
         REAL, SAVE, ALLOCATABLE :: Tmax_sum(:), Transp_tmax_f(:)
         ! Declared Parameters
@@ -50,7 +51,7 @@
             ENDIF
 !******check for month to turn transpiration switch on or off
             IF ( Nowmonth==Transp_beg(i) ) THEN
-              Transp_check(i) = ON
+              Transp_check(i) = ACTIVE
               Tmax_sum(i) = 0.0
             ENDIF
           ENDIF
@@ -59,17 +60,17 @@
 !******sum maximum temperature until greater than temperature index parameter,
 !******at which time, turn transpiration switch on, check switch off
           ! freezing temperature assumed to be 32 degrees Fahrenheit
-          IF ( Transp_check(i)==ON ) THEN
+          IF ( Transp_check(i)==ACTIVE ) THEN
             IF ( Tmaxf(i)>32.0 ) Tmax_sum(i) = Tmax_sum(i) + Tmaxf(i)
             IF ( Tmax_sum(i)>Transp_tmax_f(i) ) THEN
-              Transp_on(i) = ON
+              Transp_on(i) = ACTIVE
               Transp_check(i) = OFF
               Tmax_sum(i) = 0.0
             ENDIF
           ENDIF
 
           IF ( Basin_transp_on==OFF ) THEN
-            IF ( Transp_on(i)==ON ) Basin_transp_on = ON
+            IF ( Transp_on(i)==ACTIVE ) Basin_transp_on = ACTIVE
           ENDIF
         ENDDO
 
@@ -90,7 +91,7 @@
         IF ( declparam(MODNAME, 'transp_end', 'nhru', 'integer', &
      &       '13', '1', '13', &
      &       'Month to stop transpiration period', &
-     &       'Month to stop transpiration computations; transpiration is computed thru end of previous month', &
+     &       'Month to stop transpiration computations; transpiration is computed through the end of previous month', &
      &       'month')/=0 ) CALL read_error(1, 'transp_end')
 
         ALLOCATE ( Transp_tmax(Nhru) )
@@ -108,7 +109,7 @@
         IF ( getparam(MODNAME, 'transp_end', Nhru, 'integer', Transp_end)/=0 ) CALL read_error(2, 'transp_end')
         IF ( getparam(MODNAME, 'transp_tmax', Nhru, 'real', Transp_tmax)/=0 ) CALL read_error(2, 'transp_tmax')
 
-        IF ( Init_vars_from_file>0 ) CALL transp_tindex_restart(1)
+        IF ( Init_vars_from_file>OFF ) CALL transp_tindex_restart(READ_INIT)
         IF ( Temp_units==FAHRENHEIT ) THEN
           Transp_tmax_f = Transp_tmax
         ELSE
@@ -127,22 +128,22 @@
           i = Hru_route_order(j)
           IF ( Start_month==Transp_beg(i) ) THEN
             IF ( Start_day>10 ) THEN ! rsr, why 10? if transp_tmax < 300, should be < 10
-              Transp_on(i) = ON
+              Transp_on(i) = ACTIVE
             ELSE
-              Transp_check(i) = ON
+              Transp_check(i) = ACTIVE
             ENDIF
           ELSEIF ( Transp_end(i)>Transp_beg(i) ) THEN
-            IF ( Start_month>Transp_beg(i) .AND. Start_month<Transp_end(i) ) Transp_on(i) = ON
+            IF ( Start_month>Transp_beg(i) .AND. Start_month<Transp_end(i) ) Transp_on(i) = ACTIVE
           ELSE
-            IF ( Start_month>Transp_beg(i) .OR. motmp<Transp_end(i)+MONTHS_PER_YEAR ) Transp_on(i) = ON
+            IF ( Start_month>Transp_beg(i) .OR. motmp<Transp_end(i)+MONTHS_PER_YEAR ) Transp_on(i) = ACTIVE
           ENDIF
           IF ( Basin_transp_on==OFF ) THEN
-            IF ( Transp_on(i)==ON ) Basin_transp_on = ON
+            IF ( Transp_on(i)==ACTIVE ) Basin_transp_on = ACTIVE
           ENDIF
         ENDDO
 
       ELSEIF ( Process_flag==CLEAN ) THEN
-        IF ( Save_vars_to_file==ON ) CALL transp_tindex_restart(0)
+        IF ( Save_vars_to_file==ACTIVE ) CALL transp_tindex_restart(SAVE_INIT)
 
       ENDIF
 
@@ -161,7 +162,7 @@
       ! Local Variable
       CHARACTER(LEN=13) :: module_name
 !***********************************************************************
-      IF ( In_out==0 ) THEN
+      IF ( In_out==SAVE_INIT ) THEN
         WRITE ( Restart_outunit ) MODNAME
         WRITE ( Restart_outunit ) Tmax_sum
       ELSE

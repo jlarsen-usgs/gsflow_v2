@@ -2,19 +2,18 @@
 ! Defines stream and lake routing parameters and variables
 !***********************************************************************
       MODULE PRMS_ROUTING
-      USE PRMS_CONSTANTS, ONLY: DOCUMENTATION, ON, OFF, FT2_PER_ACRE, &
-     &    NEARZERO, DNEARZERO, OUTFLOW_SEGMENT, ERROR_param, RUN, DECL, INIT, CLEAN, &
+      USE PRMS_CONSTANTS, ONLY: DOCUMENTATION, ACTIVE, OFF, FT2_PER_ACRE, &
+     &    NEARZERO, DNEARZERO, OUTFLOW_SEGMENT, ERROR_param, &
      &    strmflow_muskingum_mann_module, strmflow_muskingum_lake_module, &
      &    strmflow_muskingum_module, strmflow_in_out_module, CASCADE_OFF, CASCADE_HRU_SEGMENT
-      USE PRMS_MODULE, ONLY: Process_flag, Nhru, Nsegment, Model, Init_vars_from_file, &
-     &    Save_vars_to_file, Strmflow_flag, Cascade_flag, Stream_temp_flag, &
-     &    Water_use_flag, Segment_transferON_OFF, Inputerror_flag, Parameter_check_flag, &
-     &    Print_debug, Glacier_flag
+      USE PRMS_MODULE, ONLY: Nhru, Nsegment, Model, Init_vars_from_file, &
+     &    Strmflow_flag, Cascade_flag, Print_debug, Glacier_flag, &
+     &    Water_use_flag, Segment_transferON_OFF, Inputerror_flag, Parameter_check_flag
       IMPLICIT NONE
 !   Local Variables
       character(len=*), parameter :: MODDESC = 'Streamflow Routing Init'
       character(len=7), parameter :: MODNAME = 'routing'
-      character(len=*), parameter :: Version_routing = '2020-09-14'
+      character(len=*), parameter :: Version_routing = '2020-12-02'
       DOUBLE PRECISION, SAVE :: Cfs2acft
       DOUBLE PRECISION, SAVE :: Segment_area
       INTEGER, SAVE :: Use_transfer_segment, Noarea_flag, Hru_seg_cascades
@@ -42,7 +41,8 @@
 !     Main routing routine
 !***********************************************************************
       INTEGER FUNCTION routing()
-      USE PRMS_ROUTING
+      USE PRMS_CONSTANTS, ONLY: RUN, DECL, INIT, CLEAN, ACTIVE, OFF, READ_INIT, SAVE_INIT
+      USE PRMS_MODULE, ONLY: Process_flag, Init_vars_from_file, Save_vars_to_file
       IMPLICIT NONE
 ! Functions
       INTEGER, EXTERNAL :: routingdecl, routinginit, route_run
@@ -55,10 +55,10 @@
       ELSEIF ( Process_flag==DECL ) THEN
         routing = routingdecl()
       ELSEIF ( Process_flag==INIT ) THEN
-        IF ( Init_vars_from_file>0 ) CALL routing_restart(1)
+        IF ( Init_vars_from_file>OFF ) CALL routing_restart(READ_INIT)
         routing = routinginit()
       ELSEIF ( Process_flag==CLEAN ) THEN
-        IF ( Save_vars_to_file==ON ) CALL routing_restart(0)
+        IF ( Save_vars_to_file==ACTIVE ) CALL routing_restart(SAVE_INIT)
       ENDIF
 
       END FUNCTION routing
@@ -120,7 +120,7 @@
      &     'cfs', Flow_headwater)/=0 ) CALL read_error(3, 'flow_headwater')
 
       IF ( declvar(MODNAME, 'flow_in_great_lakes', 'one', 1, 'double', &
-     &     'Total flow out into model domain from Great Lakes (segment_type=10)', &
+     &     'Total flow into model domain from Great Lakes (segment_type=10)', &
      &     'cfs', Flow_in_great_lakes)/=0 ) CALL read_error(3, 'flow_in_great_lakes')
 
       IF ( declvar(MODNAME, 'flow_replacement', 'one', 1, 'double', &
@@ -152,13 +152,12 @@
         IF ( declparam(MODNAME, 'seg_depth', 'nsegment', 'real', &
      &       '1.0', '0.03', '250.0', &
      &       'Segment river depth', &
-     &       'Segment river depth at bankfull, shallowest from Blackburn-Lynch 2017,'//&
+     &       'Segment river depth at bankfull; shallowest depth from Blackburn-Lynch (2017);'//&
      &       'Congo is deepest at 250 m but in the US it is probably the Hudson at 66 m', &
      &       'meters')/=0 ) CALL read_error(1, 'seg_depth')
       ENDIF
 
-      IF ( Stream_temp_flag==ON .OR. Strmflow_flag==strmflow_muskingum_mann_module &
-     &     .OR. Model==DOCUMENTATION ) THEN
+      IF ( Strmflow_flag==strmflow_muskingum_mann_module .OR. Model==DOCUMENTATION ) THEN
         ALLOCATE ( Seg_slope(Nsegment) )
         IF ( declparam( MODNAME, 'seg_slope', 'nsegment', 'real', &
      &       '0.0001', '0.0000001', '2.0', &
@@ -181,14 +180,14 @@
       ! -8 = drains to ocean; -11 = drains to Great Lake
       ALLOCATE ( Tosegment(Nsegment) )
       IF ( declparam(MODNAME, 'tosegment', 'nsegment', 'integer', &
-     &     '0', '-11', '1000000', &
+     &     '0', '0', '9999999', &
      &     'The index of the downstream segment', &
      &     'Index of downstream segment to which the segment'// &
      &     ' streamflow flows, for segments that do not flow to another segment enter 0', &
      &     'none')/=0 ) CALL read_error(1, 'tosegment')
 
       IF ( Cascade_flag==CASCADE_OFF .OR. Cascade_flag==CASCADE_HRU_SEGMENT .OR. Model==DOCUMENTATION ) THEN
-        Hru_seg_cascades = ON
+        Hru_seg_cascades = ACTIVE
         ALLOCATE ( Hru_segment(Nhru) )
         IF ( declparam(MODNAME, 'hru_segment', 'nhru', 'integer', &
      &       '0', 'bounded', 'nsegment', &
@@ -251,11 +250,11 @@
      &       'inches', Basin_segment_storage)/=0 ) CALL read_error(3, 'basin_segment_storage')
         ALLOCATE ( Segment_delta_flow(Nsegment) )
         IF ( declvar(MODNAME, 'segment_delta_flow', 'nsegment', Nsegment, 'double', &
-     &       'Cummulative flow in minus flow out for each stream segment', &
+     &       'Cumulative flow in minus flow out for each stream segment', &
      &       'cfs', Segment_delta_flow)/=0 ) CALL read_error(3, 'segment_delta_flow')
       ENDIF
 
-      IF ( Hru_seg_cascades==ON .OR. Model==DOCUMENTATION ) THEN
+      IF ( Hru_seg_cascades==ACTIVE .OR. Model==DOCUMENTATION ) THEN
         ALLOCATE ( Seginc_potet(Nsegment) )
         IF ( declvar(MODNAME, 'seginc_potet', 'nsegment', Nsegment, 'double', &
      &       'Area-weighted average potential ET for each segment'// &
@@ -332,9 +331,15 @@
       routinginit = 0
 
       Use_transfer_segment = OFF
-      IF ( Water_use_flag==ON .AND. Segment_transferON_OFF==ON ) Use_transfer_segment = ON
+      IF ( Water_use_flag==ACTIVE .AND. Segment_transferON_OFF==ACTIVE ) Use_transfer_segment = ACTIVE
 
-      IF ( Hru_seg_cascades==ON ) THEN
+      IF ( Init_vars_from_file==0 ) THEN
+        Basin_segment_storage = 0.0D0
+        IF ( Strmflow_flag==strmflow_muskingum_lake_module .OR. Strmflow_flag==strmflow_muskingum_module .OR. &
+     &       Strmflow_flag==strmflow_muskingum_mann_module ) Segment_delta_flow = 0.0D0
+      ENDIF
+
+      IF ( Hru_seg_cascades==ACTIVE ) THEN
         Seginc_potet = 0.0D0
         Seginc_gwflow = 0.0D0
         Seginc_ssflow = 0.0D0
@@ -344,7 +349,6 @@
         Seg_ssflow = 0.0D0
         Seg_sroff = 0.0D0
       ENDIF
-      Basin_segment_storage = 0.0D0
       Hru_outflow = 0.0D0
       Flow_to_ocean = 0.0D0
       Flow_to_great_lakes = 0.0D0
@@ -365,12 +369,10 @@
         Segment_type(i) = MOD( Segment_type(i), 100 )
       ENDDO
 
-      IF ( Stream_temp_flag==ON .OR. Strmflow_flag==strmflow_muskingum_mann_module ) THEN
-        IF ( getparam( MODNAME, 'seg_slope', Nsegment, 'real', Seg_slope)/=0 ) CALL read_error(2, 'seg_slope')
-      ENDIF
       IF ( Strmflow_flag==strmflow_muskingum_mann_module ) THEN
         IF ( getparam(MODNAME, 'mann_n', Nsegment, 'real', Mann_n)/=0 ) CALL read_error(2, 'mann_n')
         IF ( getparam( MODNAME, 'seg_length', Nsegment, 'real', Seg_length)/=0 ) CALL read_error(2, 'seg_length')
+        IF ( getparam( MODNAME, 'seg_slope', Nsegment, 'real', Seg_slope)/=0 ) CALL read_error(2, 'seg_slope')
 ! find segments that are too short and print them out as they are found
         ierr = 0
         DO i = 1, Nsegment
@@ -413,7 +415,7 @@
 
 ! if cascades are active then ignore hru_segment
       Noarea_flag = OFF
-      IF ( Hru_seg_cascades==ON ) THEN
+      IF ( Hru_seg_cascades==ACTIVE ) THEN
         IF ( getparam(MODNAME, 'hru_segment', Nhru, 'integer', Hru_segment)/=0 ) CALL read_error(2, 'hru_segment')
         Segment_hruarea = 0.0D0
         DO j = 1, Active_hrus
@@ -425,7 +427,7 @@
         DO j = 1, Nsegment
           Segment_area = Segment_area + Segment_hruarea(j)
           IF ( Segment_hruarea(j)<DNEARZERO ) THEN
-            Noarea_flag = ON
+            Noarea_flag = ACTIVE
             IF ( Parameter_check_flag>0 ) THEN
               WRITE ( buffer, '(I10)' ) j
               CALL write_outfile('WARNING, No HRUs are associated with segment:'//buffer)
@@ -673,7 +675,7 @@
       Cfs2acft = Timestep_seconds/FT2_PER_ACRE
 
 ! seg variables are not computed if cascades are active as hru_segment is ignored
-      IF ( Hru_seg_cascades==ON ) THEN
+      IF ( Hru_seg_cascades==ACTIVE ) THEN
         ! add hru_ppt, hru_actet
         Seginc_gwflow = 0.0D0
         Seginc_ssflow = 0.0D0
@@ -696,8 +698,8 @@
         Hru_outflow(j) = DBLE( (Sroff(j) + Ssres_flow(j) + Gwres_flow(j)) )*tocfs
         ! Note: glacr_flow (from glacier or snowfield) is added as a gain, outside stream network addition
         ! glacr_flow in inch^3, 1728=12^3
-        IF ( Glacier_flag==ON ) Hru_outflow(j) = Hru_outflow(j) + Glacr_flow(j)/1728.0/Timestep_seconds
-        IF ( Hru_seg_cascades==ON ) THEN
+        IF ( Glacier_flag==ACTIVE ) Hru_outflow(j) = Hru_outflow(j) + Glacr_flow(j)/1728.0/Timestep_seconds
+        IF ( Hru_seg_cascades==ACTIVE ) THEN
           i = Hru_segment(j)
           IF ( i>0 ) THEN
             Seg_gwflow(i) = Seg_gwflow(i) + Gwres_flow(j)
@@ -714,7 +716,7 @@
         ENDIF
       ENDDO
 
-      IF ( Use_transfer_segment==ON ) THEN
+      IF ( Use_transfer_segment==ACTIVE ) THEN
         DO i = 1, Nsegment
           Seg_lateral_inflow(i) = Seg_lateral_inflow(i) + DBLE( Segment_gain(i) - Segment_transfer(i) )
         ENDDO
@@ -731,7 +733,7 @@
 
 ! If there are no HRUs associated with a segment, then figure out some
 ! other way to get the solar radiation, the following is not great
-      ELSE !     IF ( Noarea_flag==ON ) THEN
+      ELSE !     IF ( Noarea_flag==ACTIVE ) THEN
         DO i = 1, Nsegment
 ! This reworked by markstrom
           IF ( Segment_hruarea(i)>NEARZERO ) THEN
@@ -804,6 +806,7 @@
 !     routing_restart - write or read restart file
 !***********************************************************************
       SUBROUTINE routing_restart(In_out)
+      USE PRMS_CONSTANTS, ONLY: SAVE_INIT
       USE PRMS_MODULE, ONLY: Restart_outunit, Restart_inunit
       USE PRMS_ROUTING
       IMPLICIT NONE
@@ -814,13 +817,15 @@
       ! Local Variables
       CHARACTER(LEN=7) :: module_name
 !***********************************************************************
-      IF ( In_out==0 ) THEN
+      IF ( In_out==SAVE_INIT ) THEN
         WRITE ( Restart_outunit ) MODNAME
-      IF ( Strmflow_flag==strmflow_muskingum_lake_module .OR. Strmflow_flag==strmflow_muskingum_module .OR. &
-     &     Strmflow_flag==strmflow_muskingum_mann_module ) WRITE ( Restart_outunit ) Segment_delta_flow
+        WRITE ( Restart_outunit ) Basin_segment_storage
+        IF ( Strmflow_flag==strmflow_muskingum_lake_module .OR. Strmflow_flag==strmflow_muskingum_module .OR. &
+     &       Strmflow_flag==strmflow_muskingum_mann_module ) WRITE ( Restart_outunit ) Segment_delta_flow
       ELSE
         READ ( Restart_inunit ) module_name
         CALL check_restart(MODNAME, module_name)
+        READ ( Restart_inunit ) Basin_segment_storage
         IF ( Strmflow_flag==strmflow_muskingum_lake_module .OR. Strmflow_flag==strmflow_muskingum_module .OR. &
      &     Strmflow_flag==strmflow_muskingum_mann_module ) READ ( Restart_inunit ) Segment_delta_flow
       ENDIF

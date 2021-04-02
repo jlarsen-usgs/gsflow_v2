@@ -1,19 +1,31 @@
-# PRMS V makefile
+# PRMS library makefile
 
 include ../makelist
-TARGET 	= ../$(BINDIR)/prms
+PRMSLIB = $(LIBDIR)/libprms.a
+MMFLIB	 = $(LIBDIR)/libmmf.a
+LIBS	= $(PRMSLIB) $(MMFLIB) $(FLIBS)
 
 ####################################################
 # Rules for targets
 ####################################################
-all: $(TARGET)
+all: $(PRMSLIB)
+
+$(TARGET): $(PRMSLIB)
+	$(RM) $(TARGET)
+
+$(MMFLIB):
+	$(CD) $(MMFDIR);make
+
+####################################################
+# Rules for targets
+####################################################
 
 #
 # Define all object files which make up the library
 #
 
 
-OBJS = \
+LIBOBJS = \
         basin.o \
         climateflow.o \
         cascade.o \
@@ -34,7 +46,8 @@ OBJS = \
         ide_dist.o \
         xyz_dist.o \
         precip_1sta_laps.o \
-        precip_temp_map.o \
+        temp_map.o \
+        precip_map.o \
         precip_dist2.o \
         temp_1sta_laps.o \
         temp_dist2.o \
@@ -69,9 +82,12 @@ OBJS = \
 
 install: lib
 
-$(TARGET): $(OBJS)
-	$(RM) $(TARGET)
-	$(FC) $(LDFLAGS) -o $(TARGET) $(OBJS) $(MMFLIB) $(FLIBS)
+lib: $(PRMSLIB)
+
+$(PRMSLIB): $(LIBOBJS)
+	$(RM) $(PRMSLIB)
+	$(AR) $(PRMSLIB) $(LIBOBJS)
+	$(RANLIB) $(PRMSLIB)
 
 clean:
 	$(RM) *.o *.mod *~
@@ -135,8 +151,11 @@ precip_1sta_laps.o: precip_1sta_laps.f90 prms_module.mod prms_basin.mod prms_cli
 	$(FC) -c $(FFLAGS) precip_1sta_laps.f90
 
 
-precip_temp_map.o: precip_temp_map.f90 prms_module.mod prms_basin.mod prms_climatevars.mod prms_set_time.mod prms_obs.mod prms_constants.mod
-	$(FC) -c $(FFLAGS) precip_temp_map.f90
+temp_map.o: temp_map.f90 prms_module.mod prms_basin.mod prms_climatevars.mod prms_set_time.mod prms_obs.mod prms_constants.mod
+	$(FC) -c $(FFLAGS) temp_map.f90
+
+precip_map.o: precip_map.f90 prms_module.mod prms_basin.mod prms_climatevars.mod prms_set_time.mod prms_obs.mod prms_constants.mod
+	$(FC) -c $(FFLAGS) precip_map.f90
 
 transp_tindex.o: transp_tindex.f90 prms_module.mod prms_basin.mod prms_climatevars.mod prms_set_time.mod prms_constants.mod
 	$(FC) -c $(FFLAGS) transp_tindex.f90
@@ -252,7 +271,6 @@ prms_snow.mod: snowcomp.o
 prms_cascade.mod: cascade.o
 prms_srunoff.mod: srunoff.o
 prms_soilzone.mod: soilzone.o
-prms_snowcomp.mod: snowcomp.o
 prms_routing.mod: routing.o
 prms_water_use.mod: water_use_read.o
 prms_set_time.mod: prms_time.o

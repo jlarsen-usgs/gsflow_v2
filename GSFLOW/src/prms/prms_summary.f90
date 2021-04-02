@@ -2,7 +2,7 @@
 !     WRITES NHM CSV SUMMARY FILE
 !***********************************************************************
       MODULE PRMS_PRMS_SUMMARY
-        USE PRMS_CONSTANTS, ONLY: MAXFILE_LENGTH, RUN, DECL, INIT, CLEAN, ON, OFF, &
+        USE PRMS_CONSTANTS, ONLY: MAXFILE_LENGTH, RUN, DECL, INIT, CLEAN, ACTIVE, OFF, &
      &      DOCUMENTATION, ERROR_open_out, ERROR_OPEN_IN, ERROR_READ, MAXDIM
         USE PRMS_MODULE, ONLY: Model, Process_flag, Nobs, Nsegment, Npoigages, &
      &      Csv_output_file, Inputerror_flag, Parameter_check_flag, CsvON_OFF
@@ -10,7 +10,7 @@
         ! Local Variables
         character(len=*), parameter :: MODDESC = 'Output Summary'
         character(len=*), parameter :: MODNAME = 'prms_summary'
-        character(len=*), parameter :: Version_prms_summary = '2020-07-29'
+        character(len=*), parameter :: Version_prms_summary = '2020-12-02'
         INTEGER, PARAMETER :: NVARS = 51
         INTEGER, SAVE :: Iunit
         INTEGER, SAVE, ALLOCATABLE :: Gageid_len(:)
@@ -33,14 +33,14 @@
       USE PRMS_FLOWVARS, ONLY: Basin_soil_moist, Basin_ssstor, Basin_soil_to_gw, &
      &    Basin_lakeevap, Basin_perv_et, Basin_actet, Basin_lake_stor, &
      &    Basin_gwflow_cfs, Basin_sroff_cfs, Basin_ssflow_cfs, Basin_cfs, Basin_stflow_in, &
-     &    Basin_stflow_out, Seg_outflow, Basin_recharge
+     &    Basin_stflow_out, Seg_outflow
       USE PRMS_SET_TIME, ONLY : Nowyear, Nowmonth, Nowday
       USE PRMS_OBS, ONLY: Streamflow_cfs
       USE PRMS_INTCP, ONLY: Basin_intcp_evap, Basin_intcp_stor
       USE PRMS_SNOW, ONLY: Basin_pweqv, Basin_snowevap, Basin_snowmelt, Basin_snowcov, Basin_pk_precip
       USE PRMS_SRUNOFF, ONLY: Basin_imperv_stor, Basin_dprst_evap, Basin_imperv_evap, Basin_dprst_seep, &
      &    Basin_dprst_volop, Basin_dprst_volcl, Basin_hortonian
-      USE PRMS_SOILZONE, ONLY: Basin_capwaterin, Basin_pref_flow_infil, Basin_prefflow, Basin_slowflow, &
+      USE PRMS_SOILZONE, ONLY: Basin_capwaterin, Basin_pref_flow_infil, Basin_prefflow, Basin_recharge, Basin_slowflow, &
      &    Basin_pref_stor, Basin_slstor, Basin_soil_rechr, Basin_sz2gw, Basin_dunnian
       USE PRMS_GWFLOW, ONLY: Basin_gwstor, Basin_gwin, Basin_gwsink, Basin_gwflow, &
      &    Basin_gwstor_minarea_wb, Basin_dnflow
@@ -67,7 +67,7 @@
      &                        Basin_imperv_stor + Basin_lake_stor + Basin_dprst_volop + Basin_dprst_volcl
         Basin_surface_storage = Basin_intcp_stor + Basin_pweqv + Basin_imperv_stor + Basin_lake_stor + &
      &                          Basin_dprst_volop + Basin_dprst_volcl
-        IF ( CsvON_OFF==ON ) THEN
+        IF ( CsvON_OFF==ACTIVE ) THEN
           WRITE ( chardate, '(I4.4,2("-",I2.2))' ) Nowyear, Nowmonth, Nowday
           WRITE ( Iunit, Fmt2 ) chardate, &
      &            Basin_potet, Basin_actet, Basin_dprst_evap, Basin_imperv_evap, Basin_intcp_evap, Basin_lakeevap, &
@@ -134,7 +134,7 @@
 !        ALLOCATE ( Gageout(idim) )
         Streamflow_pairs = ' '
 !        Cfs_strings = ',cfs,cfs'
-        IF ( CsvON_OFF==ON ) THEN
+        IF ( CsvON_OFF==ACTIVE ) THEN
           Cfs_strings = ',cfs'
         ELSE
           Cfs_strings = ' cfs'
@@ -167,7 +167,7 @@
             IF ( Gageid_len(i)<1 ) Gageid_len(i) = 0
             IF ( Gageid_len(i)>0 ) THEN
               IF ( Gageid_len(i)>15 ) Gageid_len(i) = 15
-              IF ( CsvON_OFF==ON ) THEN
+              IF ( CsvON_OFF==ACTIVE ) THEN
                 WRITE (Streamflow_pairs(i), '(A,I0,2A)' ) ',seg_outflow_', Poi_gage_segment(i), '_gage_', &
      &                                                    Poi_gage_id(i)(:Gageid_len(i))
               ELSE
@@ -189,7 +189,7 @@
           ENDDO
         ENDIF
 
-        IF ( CsvON_OFF==ON ) THEN
+        IF ( CsvON_OFF==ACTIVE ) THEN
           WRITE ( Fmt, '(A,I0,A)' ) '( ', Npoigages+14, 'A )'
           WRITE ( Iunit, Fmt ) 'Date,', &
      &            'basin_potet,basin_actet,basin_dprst_evap,basin_imperv_evap,basin_intcp_evap,basin_lakeevap,', &
@@ -235,7 +235,7 @@
 
       ELSEIF ( Process_flag==CLEAN ) THEN
         !IF ( control_integer(statsON_OFF, 'statsON_OFF')/=0 ) statsON_OFF = 1
-        !IF ( statsON_OFF==ON ) CALL statvar_to_csv()
+        !IF ( statsON_OFF==ACTIVE ) CALL statvar_to_csv()
         CLOSE ( Iunit )
       ENDIF
 

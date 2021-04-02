@@ -2307,7 +2307,8 @@ c   Loop over nodes in well
           do INODE=firstnode,lastnode
             il=MNWNOD(1,INODE)              
             ir=MNWNOD(2,INODE)              
-            ic=MNWNOD(3,INODE)              
+            ic=MNWNOD(3,INODE)    
+            hhnew=hnew(ic,ir,il)
             if(IBOUND(ic,ir,il).ne.0) then
               qact = MNWNOD(4,INODE)
               cond = MNWNOD(14,INODE)
@@ -2378,7 +2379,16 @@ C                                      !! or bottom of cell if seepage face cell
                    IF ( hlim.LT.BOTM(ic,ir,lbotm(il)) ) 
      +                  hlim = BOTM(ic,ir,lbotm(il))
 ! Always limit hwel for unconfined conditions
-                   IF ( hwel.LT.hlim ) hwel = hlim
+                   IF ( mnw2(5,iw) < 0.0 ) THEN
+                     !IF ( hwel.LT.hlim ) hwel = hlim !RGN
+                     IF ( hwel.LT.hlim ) then !RGN                  
+                       IF ( hlim.LT.hhnew ) hwel = hlim !RGN
+                     END IF !RGN
+                   ELSE
+                     IF ( hwel.GT.hlim ) then !RGN                  
+                       IF ( hlim.GT.hhnew ) hwel = hlim !RGN
+                     END IF !RGN
+                   END IF
                  END IF
                  iqslv = 1
                END IF
@@ -2387,7 +2397,7 @@ c   Modify HCOF and RHS arrays
 cdebug replace below line with this if debugging with No Mo Iter
 cdebug              if(iqslv.ne.0.and.kiter.gt.1.and.kiter.lt.NoMoIter) then
               if(iqslv.ne.0.and.kiter.gt.1) then
-                hhnew=hnew(ic,ir,il)
+                !hhnew=hnew(ic,ir,il)  ! RGN set above
                 qact = ( hlim - hhnew) * cond
                 if ( mnw2(5,iw) < 0.0 .and. abs(MNW2(2,iw)).eq.1) then  !RGN 1/15/16
                   if ( qact > 0.0 ) then
@@ -2510,7 +2520,8 @@ c   Loop over nodes in well
           do INODE=firstnode,lastnode
             il=MNWNOD(1,INODE)              
             ir=MNWNOD(2,INODE)              
-            ic=MNWNOD(3,INODE)              
+            ic=MNWNOD(3,INODE) 
+            hcell=hnew(ic,ir,il)
             nd=INODE-firstnode+1
             DryTest = Hnew(ic,ir,il) - Hdry
             IF(IBOUND(IC,IR,IL).EQ.0) DryTest=0D0                       !seb ADDED IBOUND CHECK FOR DRYCELL TEST
@@ -2561,9 +2572,18 @@ c
                  IF ( LAYHDT(IL).GT.0 .AND. MNW2(6,iw).NE.0 ) THEN
                    IF ( hlim.LT.BOTM(ic,ir,lbotm(il)) ) 
      +                  hlim = BOTM(ic,ir,lbotm(il))
-                   if ( hwell.LT.hlim ) hwell = hlim
+                   !if ( hwell.LT.hlim ) hwell = hlim  !rgn
+                    IF ( mnw2(5,iw) < 0.0 ) THEN  !RGN
+                     IF ( hwell.LT.hlim ) then !RGN                  
+                       IF ( hlim.LT.hcell ) hwell = hlim !RGN
+                     END IF !RGN
+                   ELSE
+                     IF ( hwell.GT.hlim ) then !RGN                  
+                       IF ( hlim.GT.hcell ) hwell = hlim !RGN
+                     END IF !RGN
+                   END IF   !RGN
                  END IF
-              hcell=hnew(ic,ir,il)
+              !hcell=hnew(ic,ir,il)  ! moved above
               cond = MNWNOD(14,INODE)
               q = cond*(hwell-hcell)    !RGN 1/15/16
               if ( mnw2(5,iw) < 0.0 .and. abs(MNW2(2,iw)).eq.1) then
@@ -2653,17 +2673,31 @@ c-lfk
               q=MNWNOD(4,INODE)
               IF ( Iuupw.GT.0 ) THEN                                    !seb ADDED BLOCK TO MATCH WHAT IS WRITTEN TO BUDGET
                 hwell = MNWNOD(15,INODE)
-                   IF ( LAYHDT(IL).GT.0  .AND. MNW2(6,iw).NE.0) THEN    !ADDED  .AND. MNW2(6,iw).NE.0 OTHERWISE HLIM is not defined
+                IF ( MNW2(6,iw).NE.0 )THEN
+                   hlim = MNW2(7,iw)
+                 ELSE
+                   hlim = hwell
+                 END IF
+                   IF ( LAYHDT(IL).GT.0 ) THEN
                      IF ( hlim.LT.BOTM(ic,ir,lbotm(il)) ) 
      +                    hlim = BOTM(ic,ir,lbotm(il))
                      if ( hwell.LT.hlim ) hwell = hlim
                    END IF
                 hcell=hnew(ic,ir,il)
                 cond = MNWNOD(14,INODE)
+                IF ( mnw2(5,iw) < 0.0 ) THEN  !RGN
+                     IF ( hwell.LT.hlim ) then !RGN                  
+                       IF ( hlim.LT.hcell ) hwell = hlim !RGN
+                     END IF !RGN
+                   ELSE
+                     IF ( hwell.GT.hlim ) then !RGN                  
+                       IF ( hlim.GT.hcell ) hwell = hlim !RGN
+                     END IF !RGN
+                   END IF   !RGN
                 q = cond*(hwell-hcell)
-                if ( mnw2(5,iw) < 0.0 ) then
-                  if ( q > 0.0 ) q = 0.0
-                end if
+                !if ( mnw2(5,iw) < 0.0 ) then
+                  !if ( q > 0.0 ) q = 0.0
+                !end if
               END IF
               if( q.le.0.0D0 ) then
                 qin = qin  + q                                          !seb CHANGED MNWNOD(4,INODE) to q   --SCOTT SHOULDN'T qin and qout be used for ratin and ratout, rather than q?
@@ -2768,14 +2802,27 @@ c   Loop over nodes in well
                 Q = MNWNOD(4,INODE)
                 IF ( Iuupw.GT.0 ) THEN                                  !seb ADDED BLOCK TO MATCH WHAT IS WRITTEN TO BUDGET
                   hwell = MNWNOD(15,INODE)
+                  IF ( MNW2(6,iw).NE.0 )THEN
+                   hlim = MNW2(7,iw)
+                  ELSE
+                   hlim = hwell
+                  END IF
                      IF ( LAYHDT(IL).GT.0 .AND. MNW2(6,iw).NE.0) THEN
-                       hlim=mnw2(7,iw)
                        IF ( hlim.LT.BOTM(ic,ir,lbotm(il)) ) 
      +                      hlim = BOTM(ic,ir,lbotm(il))
                        if ( hwell.LT.hlim ) hwell = hlim
                      END IF
                   hcell=hnew(ic,ir,il)
                   cond = MNWNOD(14,INODE)
+                  IF ( mnw2(5,iw) < 0.0 ) THEN  !RGN
+                     IF ( hwell.LT.hlim ) then !RGN                  
+                       IF ( hlim.LT.hcell ) hwell = hlim !RGN
+                     END IF !RGN
+                   ELSE
+                     IF ( hwell.GT.hlim ) then !RGN                  
+                       IF ( hlim.GT.hcell ) hwell = hlim !RGN
+                     END IF !RGN
+                   END IF   !RGN
                   q = cond*(hwell-hcell)
                 END IF
 c  lfk  active well check

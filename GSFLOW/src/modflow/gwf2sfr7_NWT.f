@@ -3680,6 +3680,7 @@ C         ACCUMULATORS (RATIN AND RATOUT).
       SFRUZINFIL = 0.0
       SFRUZDELSTOR = 0.0
       SFRUZRECH = 0.0
+      FNETSEEP = 0.0
       maxwav = NSFRSETS*NSTRAIL
       IF(IUNIT(49).GT.0) THEN  !IUNIT(49): LMT
         NINTOT = 0              
@@ -4332,7 +4333,7 @@ C         WHEN UNSATRATED FLOW IS ACTIVE.
            END IF
          END IF
 C43B----SAVE SEEPAGE TO ARRAY FOR PRINTING NET SEEPAGE IN UZF
-          FNETSEEP(IC,IR) = FNETSEEP(IC,IR) + gwflow    !RGN multiple reaches in a cell
+         FNETSEEP(IC,IR) = FNETSEEP(IC,IR) + gwflow    !RGN multiple reaches in a cell
 C
 C44-----SAVE FLOW TO AND FROM GROUND WATER IN A LIST FILE WHEN 
 C         IBD IS EQUAL TO 2. revised dep 5/10/2006--fixed 9/15/2006

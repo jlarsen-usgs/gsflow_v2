@@ -107,7 +107,7 @@ C
      +                        UZOLSFLX, NWAVST, ITRLST, LTRLST,
      +                        UZSEEP, HLDSFR, STRM, WETPER, ISTRM, SEG,
      +                        ISEG, DLKOTFLW, DLKSTAGE
-      USE GWFGAGMODULE, ONLY: IGGLST
+!      USE GWFGAGMODULE, ONLY: IGGLST
       USE GLOBAL,     ONLY: IUNIT
       IMPLICIT NONE
       INTEGER IOUT,IURESTARTSFR
@@ -143,7 +143,7 @@ C
      +                        UZOLSFLX, NWAVST, ITRLST, LTRLST,
      +                        UZSEEP, HLDSFR, STRM, WETPER, ISTRM, SEG,
      +                        ISEG, DLKOTFLW, DLKSTAGE
-      USE GWFGAGMODULE, ONLY: IGGLST
+!      USE GWFGAGMODULE, ONLY: IGGLST
       USE GLOBAL,     ONLY: IUNIT
       IMPLICIT NONE
       INTEGER IOUT, IURESTARTSFR
@@ -181,7 +181,7 @@ C
      +                        THETA, NSSITR, EVAPLK, WTHDRW, 
      +                        FLWIN, ILAKE, CNDFCT, SURFA, SSMN, SSMX,
      +                        IDIV, VOLUMETABLE, AREATABLE, DEPTHTABLE,
-     +                        NSSITR
+     +                        NSSITR, ISTARTLAK
       IMPLICIT NONE
       INTEGER IOUT,IURESTARTLAK
       CHARACTER*30 ANAME
@@ -217,6 +217,7 @@ C
          WRITE(IURESTARTLAK)VOLUMETABLE
          WRITE(IURESTARTLAK)AREATABLE
          WRITE(IURESTARTLAK)DEPTHTABLE
+         WRITE(IURESTARTLAK)ISTARTLAK
       END SUBROUTINE WRITE_LAK
 C
 C
@@ -226,7 +227,8 @@ C
      +                        RNF, PRCPLK, BGAREA, OVRLNDRNF, SURFIN, 
      +                        THETA, NSSITR, EVAPLK, WTHDRW, 
      +                        FLWIN, ILAKE, CNDFCT, SURFA, SSMN, SSMX,
-     +                        IDIV, VOLUMETABLE, AREATABLE, DEPTHTABLE
+     +                        IDIV, VOLUMETABLE, AREATABLE, DEPTHTABLE,
+     +                        ISTARTLAK
       IMPLICIT NONE
       INTEGER IOUT,IURESTARTLAK
       CHARACTER*30 ANAME
@@ -262,6 +264,7 @@ C
          READ(IURESTARTLAK)VOLUMETABLE
          READ(IURESTARTLAK)AREATABLE
          READ(IURESTARTLAK)DEPTHTABLE
+         READ(IURESTARTLAK)ISTARTLAK
       END SUBROUTINE READ_LAK
 C
       SUBROUTINE WRITE_MNW2(IOUT,IURESTARTMNW2)
@@ -388,7 +391,7 @@ C     ------------------------------------------------------------------
 !     CHARACTER*200 CNTRL
       CHARACTER*16 TEXT
 !     CHARACTER*200 FNAME
-      INCLUDE 'openspec.inc'
+!      INCLUDE 'openspec.inc'
       INTEGER LOCAT, I, J, KSTP, KPER, NCOL, NROW, ILAY
       REAL CNSTNT, PERTIM, TOTIM
 C     ------------------------------------------------------------------
@@ -475,26 +478,27 @@ C     ------------------------------------------------------------------
       USE GSFMODFLOW, ONLY: KKPER, KKSTP
 C
       INTEGER, INTENT(IN) :: IHEDFM
-      INTEGER K, KL, I, J, IFIRST, KK, IHEDUN
+      INTEGER K, IFIRST, KK, IHEDUN
       CHARACTER*16 TEXT
       DATA TEXT /'            HEAD'/
 C     ------------------------------------------------------------------
 C
       IHEDUN = IHEDFM
 C1------FOR EACH LAYER MOVE HNEW TO BUFF IF PRINT OR SAVE IS REQUESTED.
-      DO 59 K=1,NLAY
+!      DO 59 K=1,NLAY
 C
 C2------IS HEAD NEEDED FOR THIS LAYER?
-      KL=K
-      IF(IXSEC.NE.0) KL=1
+!      KL=K
+!      IF(IXSEC.NE.0) KL=1
 !      IF(IOFLG(KL,1).EQ.0 .AND. IOFLG(KL,3).EQ.0) GO TO 59  !RGN
 C
 C3------MOVE HNEW TO BUFF FOR THE LAYER.
-      DO 58 I=1,NROW
-      DO 58 J=1,NCOL
-      BUFF(J,I,K)=HNEW(J,I,K)
-   58 CONTINUE
-   59 CONTINUE
+!      DO 58 I=1,NROW
+!      DO 58 J=1,NCOL
+!      BUFF(J,I,K)=SNGL( HNEW(J,I,K) )
+!   58 CONTINUE
+!   59 CONTINUE
+       BUFF = SNGL( HNEW )
 C
 C4------FOR EACH LAYER: DETERMINE IF HEAD SHOULD BE PRINTED.
 C4------IF SO THEN CALL ULAPRS OR ULAPRW TO PRINT HEAD.
@@ -503,9 +507,9 @@ C4------IF SO THEN CALL ULAPRS OR ULAPRW TO PRINT HEAD.
 !           DO 69 K=1,NLAY
 !           KK=K
 !           IF(IOFLG(K,1).EQ.0) GO TO 69
-!           IF(IHEDFM.LT.0) CALL ULAPRS(BUFF(:,:,K),TEXT,KSTP,KPER,
+!           IF(IHEDFM.LT.0) CALL ULAPRS(BUFF(:,:,K),TEXT,KKSTP,KKPER,
 !     1               NCOL,NROW,KK,-IHEDFM,IOUT)
-!           IF(IHEDFM.GE.0) CALL ULAPRW(BUFF(:,:,K),TEXT,KSTP,KPER,
+!           IF(IHEDFM.GE.0) CALL ULAPRW(BUFF(:,:,K),TEXT,KKSTP,KKPER,
 !     1               NCOL,NROW,KK,IHEDFM,IOUT)
 !           IPFLG=1
 !   69      CONTINUE
@@ -513,9 +517,9 @@ C
 C4A-----PRINT HEAD FOR CROSS SECTION.
 !         ELSE
 !           IF(IOFLG(1,1).NE.0) THEN
-!             IF(IHEDFM.LT.0) CALL ULAPRS(BUFF,TEXT,KSTP,KPER,
+!             IF(IHEDFM.LT.0) CALL ULAPRS(BUFF,TEXT,KKSTP,KKPER,
 !     1                 NCOL,NLAY,-1,-IHEDFM,IOUT)
-!             IF(IHEDFM.GE.0) CALL ULAPRW(BUFF,TEXT,KSTP,KPER,
+!             IF(IHEDFM.GE.0) CALL ULAPRW(BUFF,TEXT,KSKTP,KKPER,
 !     1                 NCOL,NLAY,-1,IHEDFM,IOUT)
 !             IPFLG=1
 !           END IF
@@ -528,17 +532,17 @@ C5------IF SO THEN CALL ULASAV OR ULASV2 TO SAVE HEAD.
       IF(IHEDUN.LE.0) GO TO 80
       IF(IXSEC.EQ.0) THEN
         DO 79 K=1,NLAY
-        KK=K
+          KK=K
 !        IF(IOFLG(K,3).EQ.0) GO TO 79
-!        IF(IFIRST.EQ.1) WRITE(IOUT,74) IHEDUN,KSTP,KPER
+!        IF(IFIRST.EQ.1) WRITE(IOUT,74) IHEDUN,KKSTP,KKPER
 !   74   FORMAT(1X,/1X,'HEAD WILL BE SAVED ON UNIT ',I4,
 !     1      ' AT END OF TIME STEP',I6,', STRESS PERIOD ',I4) !gsf
 !        IFIRST=0
 !        IF(CHEDFM.EQ.' ') THEN   !RGN UNFORMATTED ONLY
-           CALL ULASAV(BUFF(:,:,K),TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
+          CALL ULASAV(BUFF(:,:,K),TEXT,KKSTP,KKPER,PERTIM,TOTIM,NCOL,
      1                NROW,KK,IHEDUN)
 !        ELSE
-!           CALL ULASV2(BUFF(:,:,K),TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
+!           CALL ULASV2(BUFF(:,:,K),TEXT,KKSTP,KKPER,PERTIM,TOTIM,NCOL,
 !     1                NROW,KK,IHEDUN,CHEDFM,LBHDSV,IBOUND(:,:,K))
 !        END IF
    79   CONTINUE
@@ -546,12 +550,12 @@ C
 C5A-----SAVE HEAD FOR CROSS SECTION.
       ELSE
         IF(IOFLG(1,3).NE.0) THEN
-!          WRITE(IOUT,74) IHEDUN,KSTP,KPER
+!          WRITE(IOUT,74) IHEDUN,KKSTP,KKPER
           IF(CHEDFM.EQ.' ') THEN
-             CALL ULASAV(BUFF,TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
+             CALL ULASAV(BUFF,TEXT,KKSTP,KKPER,PERTIM,TOTIM,NCOL,
      1                NLAY,-1,IHEDUN)
 !          ELSE
-!             CALL ULASV2(BUFF,TEXT,KSTP,KPER,PERTIM,TOTIM,NCOL,
+!             CALL ULASV2(BUFF,TEXT,KKSTP,KKPER,PERTIM,TOTIM,NCOL,
 !     1                  NLAY,-1,IHEDUN,CHEDFM,LBHDSV,IBOUND)
           END IF
         END IF

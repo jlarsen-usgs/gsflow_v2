@@ -44,7 +44,7 @@ void setup_cont (void) {
 /*
 **	GSFLOW control variables
 */
-        decl_control_string ("model_mode", "GSFLOW");
+        decl_control_string ("model_mode", "GSFLOW5");
         decl_control_string ("modflow_name", "modflow.nam");
         decl_control_string ("precip_module", "precip_1sta");
         decl_control_string ("temp_module", "temp_1sta");
@@ -57,7 +57,9 @@ void setup_cont (void) {
         decl_control_string ("transp_module", "transp_tindex");
         decl_control_string ("gsflow_output_file", "gsflow.out");
         decl_control_string ("gsflow_csv_file", "gsflow.csv");
-		decl_control_string ("creator_email", "unknown");
+		//decl_control_string ("creator_email", "unknown");
+		decl_control_string ("aet_module", "unknown");
+		decl_control_string ("irrigation_area_module", "unknown");
 
 /*
         cval = (char *)umalloc (sizeof (long));
@@ -97,13 +99,21 @@ void setup_cont (void) {
 		lval[0] = 0;
 		decl_control_int_array ("frozen_flag", 1, lval);
 
+		lval = (long*)umalloc(sizeof(long));
+		lval[0] = 0;
+		decl_control_int_array("agriculture_soil_flag", 1, lval);
+
+		lval = (long*)umalloc(sizeof(long));
+		lval[0] = 0;
+		decl_control_int_array("agriculture_canopy_flag", 1, lval);
+
         lval = (long *)umalloc (sizeof (long));
 		lval[0] = 0;
 		decl_control_int_array ("dprst_flag", 1, lval);
 
 		lval = (long*)umalloc(sizeof(long));
 		lval[0] = 0;
-		decl_control_int_array("PRMS_iteration_flag", 1, lval);
+		decl_control_int_array("PRMS_land_iteration_flag", 1, lval);
 
         lval = (long *)umalloc (sizeof (long));
 		lval[0] = 1;
@@ -185,6 +195,14 @@ void setup_cont (void) {
 		lval[0] = 0;
 		decl_control_int_array ("dyn_dprst_flag", 1, lval);
 
+		lval = (long*)umalloc(sizeof(long));
+		lval[0] = 0;
+		decl_control_int_array("dyn_ag_flag", 1, lval);
+
+		lval = (long*)umalloc(sizeof(long));
+		lval[0] = 0;
+		decl_control_int_array("dyn_sro_to_dprst_ag_flag", 1, lval);
+
 		lval = (long *)umalloc (sizeof (long));
 		lval[0] = 0;
 		decl_control_int_array ("stream_temp_flag", 1, lval);
@@ -228,6 +246,10 @@ void setup_cont (void) {
 		lval = (long *)umalloc (sizeof (long));
 		lval[0] = 0;
 		decl_control_int_array ("canopy_transferON_OFF", 1, lval);
+
+		lval = (long*)umalloc(sizeof(long));
+		lval[0] = 0;
+		decl_control_int_array("outputSelectDatesON_OFF", 1, lval);
 
 		lval = (long *)umalloc (sizeof (long));
 		lval[0] = 0;
@@ -301,6 +323,7 @@ void setup_cont (void) {
         decl_control_string ("transp_day", "transp.day");
         decl_control_string ("windspeed_day", "windspeed.day");
         decl_control_string ("humidity_day", "humidity.day");
+		decl_control_string ("aet_file", "aet.input");
 		decl_control_string ("pkwater_equiv_day", "pkwater_equiv.day");
         decl_control_string ("pk_depth_day", "pk_depth.day");
         decl_control_string ("snow_evap_day", "snow_evap.day");
@@ -310,6 +333,8 @@ void setup_cont (void) {
         decl_control_string ("dprst_area_dynamic", "dyndprst_area");
         decl_control_string ("dprst_depth_dynamic", "dyndprst_depth");
         decl_control_string ("dprst_frac_dynamic", "dyndprst_frac");
+		decl_control_string ("ag_frac_dynamic", "dynAg_frac");
+		decl_control_string("sro_to_dprst_ag_dynamic", "dynSro2dprst_ag.dyn");
 		decl_control_string ("snow_intcp_dynamic", "dynsnowintcp");
 		decl_control_string ("srain_intcp_dynamic", "dynsrainintcp");
 		decl_control_string ("wrain_intcp_dynamic", "dynwrainintcp");
@@ -336,6 +361,9 @@ void setup_cont (void) {
 		decl_control_string ("basinOutBaseFileName", "basinout_path");
 		decl_control_string("nsegmentOutBaseFileName", "nsegmentout_path");
 		decl_control_string("dynamic_param_log_file", "dynamic_parameter.out");
+		decl_control_string("selectDatesFileName", "selectDates.in");
+		decl_control_string("precip_map_file", "precip_map.dat");
+		decl_control_string("temp_map_file", "temp_map.dat");
 /*
 **	run start and end times
 */
@@ -412,7 +440,7 @@ void setup_cont (void) {
 		decl_control_int_array("nhruOutNcol", 1, lval);
 
         lval = (long*)umalloc(sizeof(long));
-		lval[0] = 1;
+		lval[0] = 0;
 		decl_control_int_array("prms_warmup", 1, lval);
 
 

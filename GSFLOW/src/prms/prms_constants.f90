@@ -93,7 +93,7 @@ MODULE PRMS_CONSTANTS
     ! seg_type
     integer, parameter :: OUTFLOW_SEGMENT = 0
 
-    ! soil_type
+    ! cascade flags
     integer, parameter :: CASCADE_OFF = 0
     integer, parameter :: CASCADE_NORMAL = 1
     integer, parameter :: CASCADE_HRU_SEGMENT = 2
@@ -110,6 +110,7 @@ MODULE PRMS_CONSTANTS
     integer, parameter :: INIT = 2
     integer, parameter :: CLEAN = 3
     integer, parameter :: SETDIMENS = 4
+    integer, parameter :: WRITE_CLIMATE=24, CONVERT=25, CLIMATE=26, POTET=27, TRANSPIRE=28, FROST=29
 
     ! Error Codes
     integer, parameter :: ERROR_modflow = -5
@@ -157,12 +158,14 @@ MODULE PRMS_CONSTANTS
     integer, parameter :: potet_pt_module = 5, potet_pm_sta_module = 6, potet_hs_module = 10, potet_pm_module = 11
     integer, parameter :: strmflow_muskingum_module = 4, strmflow_muskingum_mann_module = 7
     integer, parameter :: strmflow_muskingum_lake_module = 3, strmflow_in_out_module = 5, strmflow_noroute_module = 1
-    integer, parameter :: smidx_module = 1, carea_module = 2
+    integer, parameter :: smidx_module = 1, carea_module = 2, ddsolrad_module = 1, ccsolrad_module = 2
 
     integer, parameter :: OFF = 0
-    integer, parameter :: ON = 1
+    integer, parameter :: ACTIVE = 1
     integer, parameter :: INT_TYPE = 1
     integer, parameter :: REAL_TYPE = 2
     integer, parameter :: DBLE_TYPE = 3
+    integer, parameter :: SAVE_INIT = 0
+    integer, parameter :: READ_INIT = 1
 
 END MODULE PRMS_CONSTANTS

@@ -2,11 +2,12 @@
 !     Route PRMS gravity flow to MODFLOW cells
 !***********************************************************************
       MODULE GSFPRMS2MF
+      USE PRMS_CONSTANTS, ONLY: NEARZERO, ACTIVE, OFF
       IMPLICIT NONE
 !   Module Variables
       character(len=*), parameter :: MODDESC = 'GSFLOW PRMS to MODFLOW'
       character(len=*), parameter :: MODNAME = 'gsflow_prms2mf'
-      character(len=*), parameter :: Version_gsflow_prms2mf = '2020-08-11'
+      character(len=*), parameter :: Version_gsflow_prms2mf = '2021-01-08'
       REAL, PARAMETER :: SZ_CHK = 0.00001
       DOUBLE PRECISION, PARAMETER :: PCT_CHK = 0.000005D0
       INTEGER, SAVE :: NTRAIL_CHK, Nlayp1
@@ -33,18 +34,19 @@
 !           Produces cell_drain in MODFLOW units.
 !     ******************************************************************
       INTEGER FUNCTION gsflow_prms2mf()
-      USE PRMS_MODULE, ONLY: Process
+      USE PRMS_CONSTANTS, ONLY: RUN, DECL, INIT
+      USE PRMS_MODULE, ONLY: Process_flag
       IMPLICIT NONE
 ! Functions
       INTEGER, EXTERNAL :: prms2mfdecl, prms2mfinit, prms2mfrun
 !***********************************************************************
       gsflow_prms2mf = 0
 
-      IF ( Process(:3)=='run' ) THEN
+      IF ( Process_flag==RUN ) THEN
         gsflow_prms2mf = prms2mfrun()
-      ELSEIF ( Process(:4)=='decl' ) THEN
+      ELSEIF ( Process_flag==DECL ) THEN
         gsflow_prms2mf = prms2mfdecl()
-      ELSEIF ( Process(:4)=='init' ) THEN
+      ELSEIF ( Process_flag==INIT ) THEN
         gsflow_prms2mf = prms2mfinit()
       ENDIF
 
@@ -149,7 +151,7 @@
       INTEGER FUNCTION prms2mfinit()
       USE PRMS_CONSTANTS, ONLY: DEBUG_less, ERROR_param
       USE GSFPRMS2MF
-      USE GWFUZFMODULE, ONLY: NTRAIL, NWAV
+      USE GWFUZFMODULE, ONLY: NTRAIL, NWAV, IUZFBND
       USE GWFSFRMODULE, ONLY: ISEG, NSS
       USE GWFLAKMODULE, ONLY: NLAKES
       USE GSFMODFLOW, ONLY: Gwc_row, Gwc_col
@@ -159,7 +161,6 @@
      &    Basin_area_inv, Hru_area
       USE PRMS_SOILZONE, ONLY: Gvr_hru_id, Gvr_hru_pct_adjusted
       USE GLOBAL, ONLY: NLAY, NROW, NCOL
-      USE GWFUZFMODULE, ONLY: IUZFBND
       IMPLICIT NONE
       INTEGER, EXTERNAL :: getparam
       EXTERNAL read_error
@@ -184,7 +185,7 @@
         ierr = 1
       ENDIF
 
-      IF ( Have_lakes==1 ) THEN
+      IF ( Have_lakes==ACTIVE ) THEN
         IF ( Nlake/=NLAKES ) THEN
           PRINT *, 'ERROR, PRMS dimension nlake must equal Lake Package NLAKES'
           PRINT *, '       nlake=', Nlake, ' NLAKES=', NLAKES
@@ -355,11 +356,11 @@
           Totalarea = Totalarea + DBLE( Hru_area(i) ) ! gvr_hru_pct = 1.0
         ENDIF
         IF ( Hru_type(i)==2 ) THEN
-          ! Lake package active if Have_lakes=1
-          IF ( Have_lakes==0 ) THEN
+          ! Lake package active if Have_lakes=ACTIVE
+          IF ( Have_lakes==OFF ) THEN
             WRITE (*, 9001) i
             ierr = 1
-! must separate condition as lake_hru_id not allocated if have_lakes=0
+! must separate condition as lake_hru_id not allocated if have_lakes=OFF
             ! rsr, need to check that lake_hru_id not 0
           ENDIF
         ENDIF
@@ -394,12 +395,10 @@
 !***********************************************************************
       INTEGER FUNCTION prms2mfrun()
       USE GSFPRMS2MF
-      USE PRMS_CONSTANTS, ONLY: NEARZERO
       USE GSFMODFLOW, ONLY: Gvr2cell_conv, Acre_inches_to_mfl3, &
      &    Inch_to_mfl_t, Gwc_row, Gwc_col, Mft_to_days
       USE GLOBAL, ONLY: IBOUND
-!     USE GLOBAL, ONLY: IOUT
-      USE GWFUZFMODULE, ONLY: IUZFBND, NWAVST, PETRATE, IGSFLOW, FINF
+      USE GWFUZFMODULE, ONLY: IUZFBND, NWAVST, PETRATE, IGSFLOW, FINF, IUZFOPT
       USE GWFLAKMODULE, ONLY: RNF, EVAPLK, PRCPLK, NLAKES
       USE PRMS_MODULE, ONLY: Nhrucell, Gvr_cell_id, Have_lakes
       USE PRMS_BASIN, ONLY: Active_hrus, Hru_route_order, Hru_type, Hru_area, Lake_area, Lake_hru_id
@@ -426,16 +425,16 @@
 ! Add runoff and precip to lakes
 ! Pass in hru_actet for the lake
 !-----------------------------------------------------------------------
-      IF ( Have_lakes==1 ) THEN
+      IF ( Have_lakes==ACTIVE ) THEN
         RNF = 0.0
-        PRCPLK = 0.0
-        EVAPLK = 0.0
+        PRCPLK = 0.0D0
+        EVAPLK = 0.0D0
         DO ii = 1, Active_hrus
           j = Hru_route_order(ii)
           IF ( Hru_type(j)==2 ) THEN
             ilake = Lake_hru_id(j)
-            RNF(ilake) = RNF(ilake) + (Lakein_sz(j)+Hortonian_lakes(j)) &
-     &                   *Hru_area(j)*Acre_inches_to_mfl3*Mft_to_days   !RGN 7/15/2015 added *Mft_to_days
+            RNF(ilake) = RNF(ilake) + SNGL( (Lakein_sz(j)+Hortonian_lakes(j)) &
+     &                   *DBLE(Hru_area(j))*Acre_inches_to_mfl3*Mft_to_days )   !RGN 7/15/2015 added *Mft_to_days
             PRCPLK(ilake) = PRCPLK(ilake) + Hru_ppt(j)*Inch_to_mfl_t*Hru_area(j)
             EVAPLK(ilake) = EVAPLK(ilake) + Hru_actet(j)*Inch_to_mfl_t*Hru_area(j)
           ENDIF
@@ -474,7 +473,13 @@
 ! the soilzone
 !-----------------------------------------------------------------------
         IF ( Sm2gw_grav(j)>0.0 ) THEN
-          IF ( NWAVST(icol, irow)<NTRAIL_CHK ) THEN
+
+          IF ( IUZFOPT==0 ) THEN !ERIC 20210107: NWAVST is dimensioned (1, 1) if IUZFOPT == 0.
+            Cell_drain_rate(icell) = Cell_drain_rate(icell) + Sm2gw_grav(j)*Gvr2cell_conv(j)
+            Gw_rejected_grav(j) = 0.0
+            is_draining = 1            
+
+          ELSEIF ( NWAVST(icol, irow)<NTRAIL_CHK ) THEN
 !-----------------------------------------------------------------------
 ! Convert drainage from inches to MF Length/Time
 !-----------------------------------------------------------------------
@@ -489,7 +494,7 @@
 !-----------------------------------------------------------------------
         IF ( Unused_potet(ihru)>NEARZERO ) THEN
           PETRATE(icol, irow) = PETRATE(icol, irow) + Unused_potet(ihru)*Gvr2cell_conv(j)
-          Unused_potet(ihru) = Unused_potet(ihru) - Unused_potet(ihru)*Gvr_hru_pct_adjusted(j)
+          Unused_potet(ihru) = Unused_potet(ihru) - Unused_potet(ihru)*SNGL(Gvr_hru_pct_adjusted(j))
           IF ( Unused_potet(ihru)<0.0 ) Unused_potet(ihru) = 0.0
         ENDIF
       ENDDO
